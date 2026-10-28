@@ -1,4 +1,7 @@
 # Panes for `yarn agents` (start-agents.sh). One entry = one tmux pane.
+# This is the fallback. A workspace (a folder of repos, e.g. ~/work/legacy) puts its own agents.yaml
+# at its root; `yarn agents` from any repo inside it finds that one.
+# session: tmux session name (default: "<workspace folder>-agents").
 # Panes have no fixed project or role — give each agent its task in the pane.
 # cli: claude | codex | deepseek | none — the AI CLI started in the pane (none = plain shell).
 #      Exports CROSS_REVIEW_AGENT=<cli> so cross-review (10-agent-tools/cross-review) knows who is who.

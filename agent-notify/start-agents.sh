@@ -7,7 +7,8 @@ force_new=false
 # The hook-log monitor pane is opt-in (--monitor). By default every pane is a
 # plain agent pane, one per entry in agents.yaml.
 with_monitor=false
-session="ThinkAI-Agents"
+# Session name: argument > AGENTS_SESSION > `session:` in agents.yaml > "<workspace folder>-agents"
+session="${AGENTS_SESSION:-}"
 
 for arg in "$@"; do
   case "$arg" in
@@ -19,8 +20,28 @@ for arg in "$@"; do
 done
 
 script_dir="$(dirname "$(readlink -f "$0")")"
-repo_root="$(cd "$script_dir/../.." && pwd)"
-agents_yaml="$script_dir/agents.yaml"
+
+# Workspace = a folder holding several repos (e.g. ~/work/legacy), marked by its agents.yaml.
+# Panes start there and notify state lives in <workspace>/.omx/notify-state.
+# AGENTS_PROJECT_ROOT wins; otherwise the nearest folder at or above the current directory with an
+# agents.yaml (so `yarn agents` in any repo of the workspace finds it); otherwise two levels above this script.
+find_workspace() {
+  local d
+  d="$(pwd)"
+  while [[ "$d" != "/" ]]; do
+    if [[ -f "$d/agents.yaml" && "$d" != "$script_dir" ]]; then echo "$d"; return 0; fi
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+if [[ -n "${AGENTS_PROJECT_ROOT:-}" ]]; then
+  repo_root="$(cd "$AGENTS_PROJECT_ROOT" && pwd)"
+else
+  repo_root="$(find_workspace || { cd "$script_dir/../.." && pwd; })"
+fi
+# Pane list: AGENTS_YAML, else <workspace>/agents.yaml, else the one next to this script.
+agents_yaml="${AGENTS_YAML:-$repo_root/agents.yaml}"
+[[ -n "${AGENTS_YAML:-}" || -f "$agents_yaml" ]] || agents_yaml="$script_dir/agents.yaml"
 monitor_script="$script_dir/monitor-hook-log.py"
 notify_config_script="$script_dir/configure-stop-notify.sh"
 notify_state_root="$repo_root/.omx/notify-state"
@@ -36,7 +57,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 if [[ ! -f "$agents_yaml" ]]; then
-  echo "[start-agents] Missing agents.yaml in $script_dir." >&2
+  echo "[start-agents] Missing agents.yaml: $agents_yaml" >&2
   exit 1
 fi
 if [[ "$with_monitor" == "true" && ! -f "$monitor_script" ]]; then
@@ -92,6 +113,11 @@ except ImportError:
 
         # Detect indentation level on first meaningful content
         if stripped == "agents:":
+            continue
+
+        # Top-level session name (not indented)
+        if line.startswith("session:"):
+            data["session"] = stripped.split(":", 1)[1].strip().strip('"').strip("'")
             continue
 
         # New agent entry
@@ -162,6 +188,7 @@ if not data or "agents" not in data or not data["agents"]:
 
 agents = data["agents"]
 print(f"N={len(agents)}")
+print("\x1e".join(["S", str(data.get("session") or "").strip()]))
 for a in agents:
     name = a.get("name", "agent").strip()
     role = str(a.get("role") or a.get("cli") or name).strip()
@@ -188,6 +215,14 @@ parse_agents > "$parsed_file" 2>/dev/null || {
 first_line="$(head -1 "$parsed_file")"
 N="${first_line#N=}"
 
+if [[ -z "$session" ]]; then
+  session="$(awk -F $'\x1e' '$1 == "S" { print $2 }' "$parsed_file")"
+fi
+if [[ -z "$session" ]]; then
+  # tmux session names can't contain "." or ":"
+  session="$(basename "$repo_root" | tr '.:' '__')-agents"
+fi
+
 if [[ -z "$N" || "$N" -eq 0 ]]; then
   echo "[start-agents] No agents defined in $agents_yaml." >&2
   exit 1
@@ -202,6 +237,7 @@ if [[ "$force_new" != "true" ]] && tmux has-session -t "$session" 2>/dev/null; t
   pane_count="$(tmux list-panes -t "$session" -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')"
   if [[ "$pane_count" == "$expected_panes" ]]; then
     echo "[start-agents] Session '$session' exists with $pane_count pane(s). Attaching."
+    bash "$script_dir/monitor.sh" --detach || true
     tmux attach -t "$session"
     exit 0
   fi
@@ -441,6 +477,9 @@ if [[ -f "$HOME/.notify/stop-notify.json" && -f "$HOME/.notify/stop-notify.env" 
 else
   echo "[start-agents] SKIP route binding: $HOME/.notify/stop-notify.{json,env} not found"
 fi
+
+# ── Status board in its own session (monitor.sh; switch to it when you want to look) ─
+bash "$script_dir/monitor.sh" --detach || true
 
 # ── Attach ────────────────────────────────────────────────────
 echo "[start-agents] Attaching to session '$launch_session'."

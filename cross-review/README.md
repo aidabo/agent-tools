@@ -101,12 +101,27 @@ PR の label `author:claude|codex|deepseek` > `--author` > コミットの痕跡
 DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deepseek の PR には `author:deepseek` label を付けると確実。
 `no-cross-review` label の PR と draft は watch が飛ばす。
 
-## 定期実行（任意）
+## インストール（cron の巡回）
 
 ```bash
-crontab -e
-# 毎分（PC が起きている間だけ）。新しい head が無ければ gh で一覧を見るだけ。重なりは watch.sh のロックで防ぐ
-* * * * * /path/to/agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
+./install.sh              # 毎分の巡回（watch.sh）を cron に入れ、足りないものを確認して表示する
+./install.sh --check      # 確認だけ（何も変えない）
+./install.sh --uninstall  # 巡回を外す（レビュー結果・設定は残す）
+# jibunsee-react などの package.json からは: yarn cross-review:install
+```
+
+- パスの設定は要らない。install.sh の場所から watch.sh の場所を決めるので、どこに clone してもよい。
+  cron の行は 1 本だけで、前の行（別の場所に clone していた分も）は消して入れ直す。変える前の crontab は
+  `~/.cache/cross-review/crontab.bak.<日時>` に残る。何度実行してもよい。
+- 確認すること: cron が動いているか（WSL は `/etc/wsl.conf` の `[boot] systemd=true`）、`config.local.sh`
+  （無ければひな形を作る）と `REPOS` の作業ツリー、`git gh python3 flock tmux timeout`、`gh` のログイン、
+  レビュアーの `claude` / `codex` が cron の PATH から見えるか（見えなければ `EXTRA_PATH` に足す）、deepseek の起動スクリプト。
+- `claude` / `codex` のログインは確かめられないので、新しいマシンではそれぞれ一度起動してログインしておく。
+
+入る行（例）:
+
+```
+* * * * * $HOME/work/legacy/10-agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
 ```
 
 ## 各エージェントへの指示

@@ -5,3 +5,7 @@ cross-review/inbox/
 cross-review/config.local.sh
 
 __pycache__/
+
+# oh-my-claudecode / Claude Code のローカル状態
+.omc/
+.claude/

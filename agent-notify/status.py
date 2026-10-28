@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Review status board for the monitor session (monitor.sh).
 
-Main part: cross-review (../cross-review/status.sh) — each PR's review state, the
-latest review results (verdict, findings, test failures) and the reviews still waiting
-in an author's inbox. Refreshed every 60 s because it calls the GitHub API.
+Main part: cross-review (../cross-review/status.sh) — a GitHub-like PR list, one line
+per PR with its review state, author → reviewers and verdicts. Refreshed every 20 s
+because it calls the GitHub API.
 
 Below it, one short line per tmux session with what each AI pane is doing, read from
 the live pane screen: 作業中 (working) / 確認待ち (a dialog or permission prompt is
@@ -167,7 +167,7 @@ def frame(reviews: ReviewStatus) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--interval", type=float, default=3.0, help="agent refresh seconds (default 3)")
-    ap.add_argument("--review-interval", type=float, default=60.0, help="cross-review refresh seconds (default 60)")
+    ap.add_argument("--review-interval", type=float, default=20.0, help="cross-review refresh seconds (default 20)")
     ap.add_argument("--once", action="store_true", help="print once and exit")
     args = ap.parse_args()
 

@@ -78,8 +78,8 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
 
 ```bash
 crontab -e
-# 10 分おき（PC が起きている間だけ）
-*/10 * * * * /path/to/agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
+# 毎分（PC が起きている間だけ）。新しい head が無ければ gh で一覧を見るだけ。重なりは watch.sh のロックで防ぐ
+* * * * * /path/to/agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
 ```
 
 ## 各エージェントへの指示

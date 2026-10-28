@@ -48,6 +48,12 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 
 同じ PR head × レビュアーは二度レビューしない（`~/.cache/cross-review/state/`）。push で head が変われば再レビュー。
 
+## 信頼できる PR だけ
+
+PR のコードはこの PC でテストとして実行され（`.env` も見える）、レビュアーはファイルを読めて、結果は PR コメントで公開される。
+そのため **fork からの PR** と、**`TRUSTED_AUTHORS` にいない人の PR**（空なら各リポジトリの owner だけ）は、`--force` を付けても
+レビューしない。`status.sh` では「対象外」と出る。
+
 ## 作者の判定（→ レビュアー）
 
 PR の label `author:claude|codex|deepseek` > `--author` > コミットの痕跡

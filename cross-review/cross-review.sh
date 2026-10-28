@@ -45,7 +45,7 @@ exec 9>"$STATE_DIR/$repo_name.lock"
 flock 9
 
 # ── PR 情報 ────────────────────────────────────────────────
-pr_json="$(gh pr view "$pr" -R "$gh_repo" --json number,title,state,headRefOid,baseRefName,headRefName,body,labels,commits)"
+pr_json="$(gh pr view "$pr" -R "$gh_repo" --json number,title,state,headRefOid,baseRefName,headRefName,body,labels,commits,isCrossRepository,author)"
 field() { python3 -c "import json,sys; print(json.load(sys.stdin)[sys.argv[1]])" "$1" <<<"$pr_json"; }
 head_sha="$(field headRefOid)"
 base_ref="$(field baseRefName)"
@@ -53,6 +53,18 @@ head_ref="$(field headRefName)"
 title="$(field title)"
 [[ "$(field state)" == "OPEN" || "$force" == 1 ]] || die "PR #$pr is not open (use --force)"
 short="${head_sha:0:8}"
+
+# ── 信頼できる PR だけを扱う ─────────────────────────────────
+# PR のコードはこの PC でテストとして実行され（.env も見える）、レビュアーはファイルを読めて結果は PR に公開される。
+# fork からの PR や、TRUSTED_AUTHORS にいない人の PR は、--force でも扱わない。
+pr_author="$(python3 -c "import json,sys; print((json.load(sys.stdin).get('author') or {}).get('login', ''))" <<<"$pr_json")"
+trusted=" ${TRUSTED_AUTHORS:-${gh_repo%%/*}} "
+if [[ "$(field isCrossRepository)" != "False" ]]; then
+  log "skip PR #$pr ($repo_name): from a fork — not reviewed (untrusted code)"; exit 0
+fi
+if [[ "$trusted" != *" $pr_author "* ]]; then
+  log "skip PR #$pr ($repo_name): author '$pr_author' is not in TRUSTED_AUTHORS ($trusted) — not reviewed"; exit 0
+fi
 
 # ── 作者の推定（label author:X > --author > コミットの痕跡）──────────
 if [[ -z "$author" ]]; then

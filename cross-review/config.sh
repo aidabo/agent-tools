@@ -32,6 +32,10 @@ reviewers_for() {
   esac
 }
 
+# レビューしてよい PR の作者（GitHub login、スペース区切り）。空なら各リポジトリの owner だけ。
+# fork からの PR はここに関係なく扱わない（PR のコードを実行し、レビューは公開されるため）。
+TRUSTED_AUTHORS=""
+
 # レビュー結果を PR コメントにも出すか（1=出す）
 POST_COMMENT=1
 # レビュアー 1 人あたりの上限秒

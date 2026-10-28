@@ -50,7 +50,9 @@ summary_of() {
 }
 
 # 実行中のレビュー（"repo pr" の行）
-running="$(ps -eo args= | awk '{ for (i = 1; i < NF - 1; i++) if ($i ~ /cross-review\.sh$/ && $(i+2) ~ /^[0-9]+$/) { print $(i+1), $(i+2); break } }')"
+# スクリプト自身がプログラムか、bash の第 1 引数のときだけ（コマンド行に名前が出てくるだけの別プロセスは除く）
+running="$(ps -eo args= | awk '$1 ~ /cross-review\.sh$/ && $3 ~ /^[0-9]+$/ { print $2, $3; next }
+  $1 ~ /(^|\/)bash$/ && $2 ~ /cross-review\.sh$/ && $4 ~ /^[0-9]+$/ { print $3, $4 }')"
 
 echo "${B}cross-review${Z}"
 if [[ ${#REPOS[@]} -eq 0 ]]; then
@@ -60,10 +62,12 @@ fi
 for entry in "${REPOS[@]}"; do
   IFS='|' read -r name gh_repo _ _ <<<"$entry"
   echo "  ${B}$name${Z} ${D}($gh_repo)${Z}"
-  if ! prs="$(gh pr list -R "$gh_repo" --state open --json number,title,headRefOid,isDraft,labels \
+  trusted=" ${TRUSTED_AUTHORS:-${gh_repo%%/*}} "
+  if ! prs="$(gh pr list -R "$gh_repo" --state open --json number,title,headRefOid,isDraft,labels,isCrossRepository,author \
       -q '.[] | [.number, .headRefOid[0:8],
-                 (if .isDraft then "draft" elif ([.labels[].name] | index("no-cross-review")) then "no-cross-review" else "-" end),
-                 .title] | @tsv' 2>&1)"; then
+                 (if .isDraft then "draft" elif ([.labels[].name] | index("no-cross-review")) then "no-cross-review"
+                  elif .isCrossRepository then "fork" else "-" end),
+                 (.author.login // "-"), .title] | @tsv' 2>&1)"; then
     echo "    ${R}PR を取得できません: ${prs%%$'\n'*}${Z}"
     continue
   fi
@@ -72,7 +76,8 @@ for entry in "${REPOS[@]}"; do
     continue
   fi
   # skip は空にしない（"-"）: タブは IFS の空白扱いで、空の列は詰められてしまう
-  while IFS=$'\t' read -r num sha skip title; do
+  while IFS=$'\t' read -r num sha skip author title; do
+    [[ "$skip" == "-" && "$trusted" != *" $author "* ]] && skip="信頼外の作者 $author"
     (( ${#title} > 40 )) && title="${title:0:39}…"
     done_by=()
     for f in "$STATE_DIR/$name-$num-$sha-"*.done; do

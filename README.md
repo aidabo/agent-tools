@@ -21,9 +21,9 @@ tmux で複数の AI エージェント（claude / codex / deepseek）を並べ�
 4. リポジトリの package.json に yarn のコマンドを足す（例）:
 
    ```json
-   "agents": "bash ${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/start-agents.sh",
-   "monitor": "bash ${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/monitor.sh",
-   "cross-review:install": "bash ${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/cross-review/install.sh"
+   "agents": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/start-agents.sh\"",
+   "monitor": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/monitor.sh\"",
+   "cross-review:install": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/cross-review/install.sh\""
    ```
 
    agent-tools を別の場所に clone したマシンでは、シェルの設定（`~/.bashrc` など）に

@@ -208,6 +208,9 @@ if not text:
 sys.stdout.write(text if text.endswith("\n") else text + "\n")' "$1"
 }
 
+# 読み取り専用で動かす: --restricted はコマンド実行系のツールを外し、ユーザー/プロジェクトの設定ファイル
+# （そこにある許可ルール・hook）を読まず、ファイル操作を worktree の中に限る。dontAsk は事前に許したもの以外を断る。
+# 使えるのは Read/Grep/Glob と git の閲覧だけ。MCP も使わない。
 run_reviewer() {
   local who="$1" out="$2"
   # レビュアーであることを示す。PROTOCOL.md はこのとき inbox を見ない・PR を作らないと定める。
@@ -219,8 +222,9 @@ run_reviewer() {
       # （ANTHROPIC_API_KEY があるとそちらが優先され、無効なら "Invalid API key" で落ちる）。
       (cd "$wt" && unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDECODE \
         CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
+        --restricted --strict-mcp-config --permission-mode dontAsk --tools "Read,Grep,Glob,Bash" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
-        --disallowedTools "Edit,Write,NotebookEdit" --output-format stream-json --verbose \
+        --output-format stream-json --verbose \
         > "$work/$who.events.jsonl" < /dev/null) && stream_result "$work/$who.events.jsonl" > "$out"
       ;;
     deepseek)
@@ -228,8 +232,9 @@ run_reviewer() {
       # 鍵を別ファイルに複製しないため。外部入力は通らない。
       (cd "$wt" && unset ANTHROPIC_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && set -a && eval "$(grep -E '^(export|unset) ' "$DEEPSEEK_LAUNCHER")" && set +a && \
         timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
+        --restricted --strict-mcp-config --permission-mode dontAsk --tools "Read,Grep,Glob,Bash" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
-        --disallowedTools "Edit,Write,NotebookEdit" --output-format stream-json --verbose \
+        --output-format stream-json --verbose \
         > "$work/$who.events.jsonl" < /dev/null) && stream_result "$work/$who.events.jsonl" > "$out"
       ;;
     codex)

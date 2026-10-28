@@ -55,12 +55,15 @@ IN REVIEW の行には、いま何をしているかが出る: `running tests 0:
    ツリーへの symlink（読むだけ）。
 2. **テストはスクリプトが走らせる**（`config.local.sh` の `test_cmds_for`。host は typecheck と変更ファイルに関係する
    vitest、business-libs は変更パッケージの tsc）。AI には結果とログだけ渡す。
-3. 作者以外のエージェントが **読み取り専用** でレビューする（claude/deepseek は `--allowedTools` を Read/Grep/Glob と
-   git の閲覧だけに、codex は `--sandbox read-only`）。複数レビュアーは並列。
+3. 作者以外のエージェントが **読み取り専用** でレビューする。claude/deepseek は `--restricted`（コマンド実行系ツールを外し、
+   ユーザー・プロジェクトの設定ファイルの許可ルールや hook を読まず、ファイル操作を worktree の中に限る）＋
+   `--permission-mode dontAsk` で、使えるのは Read/Grep/Glob と `git diff/log/show` だけ。MCP も使わない。
+   codex は `--sandbox read-only`。複数レビュアーは並列。
 4. 結果を `REPORT_DIR/<repo>-pr<N>-<sha8>-<reviewer>.md` に保存し、PR コメントにも出す（`POST_COMMENT`）。
 5. 作者の `inbox/<agent>/` にポインタを置き、`notify.sh` が作者の pane に **手すきのときだけ** 1 行送る
    （作業中の表示が無く、入力欄が空のとき。codex の薄字の placeholder は空とみなす）。作業中なら送らず、
-   cron の次の巡回で再試行する。送ったポインタには `.notified` が付く。作者は `PROTOCOL.md` に従って直す。
+   cron の次の巡回で再試行する。送ったポインタには `.notified`（中身は送った先のエージェントの PID）が付く。
+   そのエージェントのセッションが閉じた・再起動したら、新しいセッションに送り直す。作者は `PROTOCOL.md` に従って直す。
 
 同じ PR head × レビュアーは二度レビューしない（`~/.cache/cross-review/state/`）。push で head が変われば再レビュー。
 
@@ -69,6 +72,20 @@ IN REVIEW の行には、いま何をしているかが出る: `running tests 0:
 PR のコードはこの PC でテストとして実行され（`.env` も見える）、レビュアーはファイルを読めて、結果は PR コメントで公開される。
 そのため **fork からの PR** と、**`TRUSTED_AUTHORS` にいない人の PR**（空なら各リポジトリの owner だけ）は、`--force` を付けても
 レビューしない。`status.sh` では「対象外」と出る。
+
+## 履歴と、止まったときのこと
+
+| 何 | どこ |
+|---|---|
+| レビュー結果（本文） | `REPORT_DIR/<repo>-pr<N>-<sha8>-<reviewer>.md`（このマシンは `~/work/legacy/22-temp/reviews/cross/`）と、同じ内容の PR コメント |
+| テストのログ | 同じ場所の `<repo>-pr<N>-<sha8>-tests.log` |
+| レビュー済みの印 | `~/.cache/cross-review/state/<repo>-<N>-<sha8>-<reviewer>.done` |
+| 作者への受け渡し | `inbox/<agent>/*.txt`（作者が対応したら消す）、`.notified` |
+| 巡回のログ | `~/.cache/cross-review/watch.log` |
+| 実行中の様子 | レビュー用 worktree の `.cross-review/`（`phase`、`<reviewer>.events.jsonl`。次のレビューで上書き） |
+
+すべてファイルなので、エージェントのセッションが切れても、PC・WSL を再起動しても残る。cron が毎分見直すので、
+途中で止まったレビュー（`.done` が無い）は次の巡回でやり直し、作者が対応していない inbox は新しいセッションに送り直す。
 
 ## 作者の判定（→ レビュアー）
 

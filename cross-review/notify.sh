@@ -3,7 +3,8 @@
 #
 # 「手すき」= 作業中の表示が無く、入力欄が空（codex の薄字の placeholder は空とみなす）。
 # 作業中・入力中・ダイアログ表示中は送らない。cron の watch.sh が数分おきに呼ぶので、
-# 次の巡回で手すきになっていれば届く。送ったポインタには .notified を付けて二度送らない。
+# 次の巡回で手すきになっていれば届く。送ったポインタには .notified（中身は送った先のエージェントの PID）を付けて
+# 二度送らない。ただしその PID がもう無い（セッションを閉じた・再起動した）なら、新しいセッションに送り直す。
 set -uo pipefail
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # shellcheck source=config.sh
@@ -57,24 +58,33 @@ pick_pane() {
     [[ -z "$id" ]] && continue
     [[ -z "$best" ]] && best="$id"
     cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
-    if [[ -n "$src" && "$cwd" == "$src"* ]]; then best="$id"; break; fi
+    if [[ -n "$src" && "$cwd" == "$src"* ]]; then best="$id $pid"; break; fi
+    [[ "$best" == "$id" ]] && best="$id $pid"
   done < <(panes_of "$agent")
   echo "$best"
 }
 
+# 送ってよいポインタ: まだ送っていない、または送った先のエージェントのプロセスがもう無い
+needs_notice() {
+  local f="$1" pid
+  [[ -e "$f.notified" ]] || return 0
+  pid="$(cat "$f.notified" 2>/dev/null)"
+  [[ "$pid" =~ ^[0-9]+$ && ! -d "/proc/$pid" ]]   # 中身が空（以前の形式）は送り済みとみなす
+}
+
 for agent in claude codex deepseek; do
   dir="$INBOX_DIR/$agent"; [[ -d "$dir" ]] || continue
-  mapfile -t fresh < <(find "$dir" -maxdepth 1 -name '*.txt' 2>/dev/null | sort | while read -r f; do [[ -e "$f.notified" ]] || echo "$f"; done)
+  mapfile -t fresh < <(find "$dir" -maxdepth 1 -name '*.txt' 2>/dev/null | sort | while read -r f; do needs_notice "$f" && echo "$f"; done)
   [[ ${#fresh[@]} -gt 0 ]] || continue
   repo=""
   for entry in "${REPOS[@]}"; do IFS='|' read -r n _ _ _ <<<"$entry"; [[ "$(basename "${fresh[0]}")" == "$n-pr"* ]] && repo="$n"; done
-  pane="$(pick_pane "$agent" "$repo")"
+  read -r pane agent_pid <<<"$(pick_pane "$agent" "$repo")"
   if [[ -z "$pane" ]]; then log "$agent: pane が見つからない（起動していない）— 保留 ${#fresh[@]} 件"; continue; fi
   if ! pane_is_idle "$pane"; then log "$agent ($pane): 作業中か入力中 — 次の巡回で再試行"; continue; fi
   msg="cross-review: ${INBOX_DIR/#$HOME/~}/$agent/ にレビューが ${#fresh[@]} 件届きました。${CROSS_REVIEW_HOME/#$HOME/~}/PROTOCOL.md の「レビューを受け取る」に従って対応してください。"
   tmux send-keys -t "$pane" -l "$msg"
   sleep "${SENDTMUX_DELAY_SECONDS:-1}"
   tmux send-keys -t "$pane" Enter
-  for f in "${fresh[@]}"; do touch "$f.notified"; done
+  for f in "${fresh[@]}"; do echo "$agent_pid" > "$f.notified"; done
   log "$agent ($pane): 通知しました（${#fresh[@]} 件）"
 done

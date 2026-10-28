@@ -185,9 +185,11 @@ def main() -> int:
     try:
         if saved:
             tty.setcbreak(fd)
-        sys.stdout.write("\033[?25l")                       # hide cursor
+        # alternate screen + overwrite in place: clearing with ESC[2J would push every frame into tmux scrollback
+        sys.stdout.write("\033[?1049h\033[?25l")
         while True:
-            sys.stdout.write("\033[H\033[2J" + frame(reviews) + "\n")
+            body = "\n".join(line + "\033[K" for line in frame(reviews).split("\n"))
+            sys.stdout.write("\033[H" + body + "\033[J")
             sys.stdout.flush()
             shown_review = reviews.updated
             deadline = time.time() + args.interval
@@ -206,7 +208,7 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
-        sys.stdout.write("\033[?25h\n")
+        sys.stdout.write("\033[?25h\033[?1049l")
         if saved:
             termios.tcsetattr(fd, termios.TCSADRAIN, saved)
 

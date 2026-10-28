@@ -19,9 +19,21 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 ## 状態を見る
 
 ```bash
-./status.sh        # PR ごとの状態（レビュー待ち / レビュー中 / レビュー済み＋判定 / 対象外）、最近のレビュー結果、inbox に残っているレビュー、最終巡回
+./status.sh        # GitHub の PR 一覧のように 1 PR 1 行、新しい順
 ```
 
+```
+ Open
+  ● CHANGES REQUESTED business-libs  #16  Harden estate ViewModel …   3m ago  codex → claude ✗ 高1 中1  → codex fixing
+  ● APPROVED          jibunsee-react #390 Connect editor …            8m ago  claude → codex ✓ 低1  → merge on GitHub
+ Done (last 24h)
+  ✓ MERGED            business-libs  #15  Expose hazard metadata …   20m ago  codex → claude ✓ 低3
+```
+
+状態: WAITING（次の巡回でレビュー）→ IN REVIEW → CHANGES REQUESTED（作者が直して push すると WAITING に戻る）/
+REVIEWED（コメントだけ）/ APPROVED（GitHub でマージしてよい）。SKIPPED は draft・`no-cross-review`・fork・信頼外の作者。
+テストが失敗した PR は CHANGES REQUESTED。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 1 日）。
+各行の `作者 → レビュアー ✓/✗/~ 指摘数` の作者は `author:` label か、レポートの author 行。
 読むだけで、レビューは走らせない。`agent-notify/monitor.sh` の監視セッションにも同じ内容が出る。
 
 ## 設定（別のプロジェクトで使う）

@@ -42,7 +42,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 状態: WAITING（次の巡回でレビュー）→ IN REVIEW → CHANGES REQUESTED（作者が直して push すると WAITING に戻る）/
 NEEDS YOU（回数の上限で止めた。マージするかはあなたが決める）/
 REVIEWED（コメントだけ）/ APPROVED（GitHub でマージしてよい）。SKIPPED は draft・`no-cross-review`・fork・信頼外の作者。
-テストが失敗した PR は CHANGES REQUESTED。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 1 日）。
+テストが失敗した PR は CHANGES REQUESTED。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 3 日）。件数は、監視ボードでは pane の高さに収まるだけ（ボードが空き行数を `CR_MAX_LINES` で渡す）、手で実行したときは `CROSS_REVIEW_DONE_MAX`（既定 15）。
 各行の `作者 → レビュアー ✓/✗/~ 指摘数` の作者は `author:` label か、レポートの author 行。
 IN REVIEW の行には、いま何をしているかが出る: `running tests 0:42`、または
 `claude Read index.ts · 12 steps · active · 2:15`（最後の操作・ツール実行数・45 秒以内に動きがあれば active、無ければ quiet と経過）。

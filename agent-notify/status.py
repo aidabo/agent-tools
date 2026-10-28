@@ -134,7 +134,7 @@ class ReviewStatus:
 
     def loop(self) -> None:
         while True:
-            env = dict(os.environ, FORCE_COLOR="1")
+            env = dict(os.environ, FORCE_COLOR="1", CR_MAX_LINES=str(review_lines_free()))
             try:
                 res = subprocess.run(["bash", str(CROSS_REVIEW_STATUS)], capture_output=True, text=True,
                                      timeout=120, env=env)
@@ -156,13 +156,25 @@ class ReviewStatus:
             return [self.lines[0] + stamp, *self.lines[1:]]
 
 
+AGENT_ROWS = [1]   # agent lines in the last frame (the review list gets the rest of the height)
+
+
+def review_lines_free() -> int:
+    """Lines the cross-review part may use: the pane height minus the clock line, the blank line,
+    the agent header and the agent rows."""
+    rows = os.get_terminal_size().lines if sys.stdout.isatty() else 40
+    return max(10, rows - 3 - AGENT_ROWS[0] - 1)
+
+
 def frame(reviews: ReviewStatus) -> str:
+    agents = agent_lines()
+    AGENT_ROWS[0] = len(agents)
     return "\n".join([
         f"{DIM}{datetime.now():%H:%M:%S}   r: 更新  q: 終了  前のセッションへ: prefix + L{RESET}",
         *reviews.render(),
         "",
         f"{BOLD}エージェント{RESET}",
-        *agent_lines(),
+        *agents,
     ])
 
 

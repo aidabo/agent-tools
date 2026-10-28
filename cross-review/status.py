@@ -11,7 +11,8 @@ One line per PR, newest first. Open PRs on top:
   NEEDS YOU          reviewed MAX_ROUNDS times and still changing — automatic review stopped, you decide
   SKIPPED            draft / no-cross-review label / from a fork / author not trusted
 
-Below, PRs merged or closed in the last CROSS_REVIEW_DONE_DAYS days (default 1), at most 6.
+Below, PRs merged or closed in the last CROSS_REVIEW_DONE_DAYS days (default 3): as many as fit in
+CR_MAX_LINES (the board passes its free height), else CROSS_REVIEW_DONE_MAX (default 15).
 
 With CR_HISTORY="<repo>|<PR>" (status.sh <repo> <PR>): every review round of that PR instead.
 """
@@ -350,7 +351,7 @@ def main() -> int:
                 return history(name, int(want_num), gh_repo, dict(base, report_dir=report_dir))
         print(f"unknown repo: {want_repo}", file=sys.stderr)
         return 1
-    done_days = float(os.environ.get("CROSS_REVIEW_DONE_DAYS", "1"))
+    done_days = float(os.environ.get("CROSS_REVIEW_DONE_DAYS", "3"))
     running = running_reviews()
     items, errors = [], []
     for name, gh_repo, wt, report_dir in repos:
@@ -380,10 +381,17 @@ def main() -> int:
     print(*errors, sep="\n") if errors else None
     print(f" {BOLD}Open{RESET}")
     print("\n".join(render_line(i, repo_w) for i in open_items) or f"  {DIM}none{RESET}")
-    print(f" {BOLD}Done{RESET} {DIM}(last {done_days * 24:g}h){RESET}")
-    print("\n".join(render_line(i, repo_w) for i in done_items[:6]) or f"  {DIM}none{RESET}")
-    if len(done_items) > 6:
-        print(f"  {DIM}… {len(done_items) - 6} more{RESET}")
+    print(f" {BOLD}Done{RESET} {DIM}(last {done_days:g} days · {len(done_items)}){RESET}")
+    # Done gets whatever height is left: the board passes its free lines in CR_MAX_LINES
+    budget = int(os.environ.get("CR_MAX_LINES") or 0)
+    if budget:
+        used = 1 + len(errors) + 1 + max(1, len(open_items)) + 1 + 1   # header, errors, Open, its rows, Done, cron
+        max_done = max(3, budget - used - (1 if len(done_items) > budget - used else 0))
+    else:
+        max_done = int(os.environ.get("CROSS_REVIEW_DONE_MAX") or 15)
+    print("\n".join(render_line(i, repo_w) for i in done_items[:max_done]) or f"  {DIM}none{RESET}")
+    if len(done_items) > max_done:
+        print(f"  {DIM}… {len(done_items) - max_done} more{RESET}")
     print(os.environ.get("CR_CRON_LINE", ""))
     return 0
 

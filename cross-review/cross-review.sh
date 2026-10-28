@@ -139,7 +139,7 @@ if [[ "$do_test" == 1 ]]; then
     fi
     if [[ "$cmd" == *"{PKG_DIRS}"* ]]; then
       [[ ${#pkg_dirs[@]} -gt 0 ]] || { test_summary+="- skip: tsc (パッケージの変更なし)"$'\n'; continue; }
-      cmd="${cmd//\{PKG_DIRS\}/${pkg_dirs[*]}}"
+      cmd="${cmd//\{PKG_DIRS\}/$(printf '%q ' "${pkg_dirs[@]}")}"
     fi
     log "test: $cmd"
     echo "\$ $cmd" >> "$work/tests.log"

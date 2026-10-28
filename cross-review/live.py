@@ -115,7 +115,7 @@ class LogFilter:
             self.pending = ""
             return []
         held, self.pending = self.pending, ""
-        color = (RED if ("FAILED" in line or "failed" in line or "error" in line.lower()) else
+        color = (RED if ("FAILED" in line or "failed" in line or "error" in line.lower() or "secret scan" in line) else
                  GREEN if ("done:" in line or "posted" in line or "通知しました" in line) else
                  BOLD if "reviewing with" in line else "")
         return ([held] if held else []) + [f"{color}{line}{RESET}" if color else line]

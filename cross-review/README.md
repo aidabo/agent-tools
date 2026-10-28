@@ -77,6 +77,20 @@ IN REVIEW の行には、いま何をしているかが出る: `running tests 0:
 
 同じ PR head × レビュアーは二度レビューしない（`~/.cache/cross-review/state/`）。push で head が変われば再レビュー。
 
+## 秘密の値の検査
+
+レビューの前に、スクリプトが PR の **足した行** から秘密の値を探す（`secret_scan.py`。AI に任せず必ず走る）:
+AWS のアクセスキー・秘密鍵、GitHub / Slack / OpenAI / Anthropic / Google / Stripe のトークン、Slack・Discord の webhook、
+JWT、`password=` / `api_key=` などへの実値の代入、認証情報入りの URL、`.env`・`*.pem`・`id_rsa` などのファイルの追加。
+
+- 見つかったら、値は **伏せて**（`AKIA****(20 chars)`）レポートの頭（`- secrets: N found`）とレビュアーへの指示に入れる。
+  レビュアーは、ダミー・例だと確かめられない限り [高] で CHANGES_REQUESTED にする。値そのものは書かない
+  （レビューは PR コメントで公開されるので、検出で二度漏らさない）。
+- ボードではその PR が `secrets✗` 付きの CHANGES REQUESTED になる。
+- 例・ダミー（`example` `dummy` `your-…` `${VAR}` `$VAR` `process.env…` など）と `.env.example` は数えない。
+  わざと置くテスト用の値は、その行に `secret-scan: allow` と書く。
+- 単体で試す: `python3 secret_scan.py <diff.patch>`（見つかれば exit 1）。
+
 ## 終わらないレビューを防ぐ
 
 - **再レビューは前回の続き。** 前回レビューした head があれば、前回のレビューと前回からの差分（`since-last.patch`）を

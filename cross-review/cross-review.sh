@@ -186,6 +186,17 @@ fi
 mapfile -t changed < <(git -C "$wt" diff --name-only "$merge_base" "$head_sha")
 log "changed files: ${#changed[@]}"
 
+# ── 秘密の値の検査（スクリプトが行う。AI より前）──────────────
+# PR が足した行だけを見る。値は伏せて出す（結果は PR コメントで公開されるので、検出で二度漏らさない）。
+secret_hits="$(python3 -I "$here/secret_scan.py" "$work/diff.patch" || true)"
+printf '%s\n' "$secret_hits" > "$work/secrets.log"
+if [[ -n "$secret_hits" ]]; then
+  secrets_summary="$(grep -c . <<<"$secret_hits") found"
+  log "secret scan: $secrets_summary"
+else
+  secrets_summary="none"
+fi
+
 # ── テスト（スクリプトが実行。AI には結果だけ渡す）────────────────
 test_summary="(テストは実行していない)"
 if [[ "$do_test" == 1 ]]; then
@@ -234,6 +245,11 @@ cat > "$prompt_file" <<EOF
 $test_summary
 観点: 正しさ・既存挙動の回帰・セキュリティ（秘密の値の混入、認証境界）・テスト不足・規約違反。
 推測ではなく、コードで確かめた指摘だけを書いてください。好みの問題は書かないでください。
+- 秘密の値の検査（スクリプトが実行済み。値は伏せてある）: $secrets_summary
+$(sed 's/^/  - /' "$work/secrets.log" | grep -v '^  - $')
+  秘密の値（アクセスキー・API キー・パスワード・トークン・秘密鍵・認証情報入りの URL・.env など）が追加されていないかは
+  必ず見てください（検査に出なかったものも）。見つけたら、ダミー・例だとコードで確かめられない限り [高] で CHANGES_REQUESTED。
+  指摘に値そのものは書かないでください（先頭 4 文字まで）。
 $rereview_note
 
 出力形式（Markdown、これ以外は書かない）:
@@ -318,6 +334,8 @@ for i in "${!pids[@]}"; do
       echo
       echo "- head: \`$head_sha\` / author: $author / reviewed: $(date '+%Y-%m-%d %H:%M %Z')"
       echo "- tests: $(echo "$test_summary" | tr '\n' ' ')"
+      echo "- secrets: $secrets_summary"
+      [[ -n "$secret_hits" ]] && sed 's/^/  - /' <<<"$secret_hits"
       echo
       cat "$out.tmp"; } > "$out"
     rm -f "$out.tmp"

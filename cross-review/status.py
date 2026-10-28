@@ -110,7 +110,7 @@ def running_reviews() -> set[tuple[str, str]]:
 
 def summarize_report(path: Path) -> dict:
     """Verdict, findings by severity and test failure from a report cross-review.sh wrote."""
-    verdict, sev, tests_failed, sec, author = "", {"高": 0, "中": 0, "低": 0}, False, "", ""
+    verdict, sev, tests_failed, sec, author, secrets = "", {"高": 0, "中": 0, "低": 0}, False, "", "", False
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"/ author: ([\w-]+) /", line)              # "- head: `…` / author: codex / reviewed: …"
         if m and not author:
@@ -120,13 +120,15 @@ def summarize_report(path: Path) -> dict:
             continue
         if line.startswith("- tests:") and re.search(r"exit=[1-9]", line):
             tests_failed = True
+        if re.match(r"- secrets: [1-9]\d* found", line):
+            secrets = True
         if sec == "判定" and not verdict and line.strip():
             m = re.search(r"[A-Z_]{4,}", line)
             verdict = m.group(0) if m else line.split()[0]
         m = re.match(r"- \[(高|中|低)\]", line)
         if sec == "指摘" and m:
             sev[m.group(1)] += 1
-    return {"verdict": verdict or "?", "sev": sev, "tests_failed": tests_failed, "author": author}
+    return {"verdict": verdict or "?", "sev": sev, "tests_failed": tests_failed, "author": author, "secrets": secrets}
 
 
 def mmss(sec: float) -> str:
@@ -204,7 +206,7 @@ def reviewer_cells(reviews: dict[str, dict]) -> str:
         v = s["verdict"]
         mark, col = {"APPROVE": ("✓", GREEN), "CHANGES_REQUESTED": ("✗", RED)}.get(v, ("~", MAGENTA))
         sev = " ".join(f"{k}{n}" for k, n in s["sev"].items() if n)
-        test = f" {RED}tests✗{RESET}" if s["tests_failed"] else ""
+        test = (f" {RED}tests✗{RESET}" if s["tests_failed"] else "") + (f" {RED}{BOLD}secrets✗{RESET}" if s.get("secrets") else "")
         cells.append(f"{col}{r} {mark}{RESET}{(' ' + DIM + sev + RESET) if sev else ''}{test}")
     return "  ".join(cells)
 
@@ -227,7 +229,8 @@ def review_rounds(cfg: dict, repo: str, num: int) -> list[tuple[str, float, dict
 
 
 def all_approved(revs: dict[str, dict]) -> bool:
-    return bool(revs) and all(s["verdict"] == "APPROVE" and not s["tests_failed"] for s in revs.values())
+    return bool(revs) and all(s["verdict"] == "APPROVE" and not s["tests_failed"] and not s.get("secrets")
+                              for s in revs.values())
 
 
 def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
@@ -271,7 +274,7 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
             key, note = "waiting", "next cron pass"
         else:
             verdicts = {s["verdict"] for s in reviews.values()}
-            if "CHANGES_REQUESTED" in verdicts or any(s["tests_failed"] for s in reviews.values()):
+            if "CHANGES_REQUESTED" in verdicts or any(s["tests_failed"] or s.get("secrets") for s in reviews.values()):
                 key = "changes"
                 who = agent or (inbox[0][0] if inbox else "author")
                 told = all(n for _, n in inbox) if inbox else True

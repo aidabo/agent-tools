@@ -22,13 +22,14 @@ REPOS=()
 # （どちらもクォート済みで埋め込まれる）。
 test_cmds_for() { :; }
 
-# 作者 → レビュアー（互いにレビュー）。作者が分からないときは unknown。
+# 作者 → レビュアー（作者以外の全員。並列に動く）。作者が分からないときは unknown — 3 人とも入るが、
+# cross-review.sh は作者と同じエージェントを必ず外す。deepseek は DeepSeek API の従量課金。
 reviewers_for() {
   case "$1" in
-    claude)   echo "codex" ;;
-    codex)    echo "claude" ;;
+    claude)   echo "codex deepseek" ;;
+    codex)    echo "claude deepseek" ;;
     deepseek) echo "codex claude" ;;
-    *)        echo "claude codex" ;;
+    *)        echo "claude codex deepseek" ;;
   esac
 }
 

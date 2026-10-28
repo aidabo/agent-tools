@@ -97,7 +97,7 @@ private リポジトリのコードを引用するレビューを載せない）
 PR の label `author:claude|codex|deepseek` > `--author` > コミットの痕跡
 （`Co-Authored-By: Claude` → claude、`Constraint:`/`Confidence:` → codex、`deepseek` の文字 → deepseek）。
 作者と同じエージェントは、`--reviewer` で指定しても `reviewers_for` の設定でも、必ずレビュアーから外す（自分の PR は自分でレビューしない）。
-対応表は `config.sh` の `reviewers_for`（claude→codex、codex→claude、deepseek→codex+claude、不明→claude+codex。`config.local.sh` で上書きできる）。
+対応表は `config.sh` の `reviewers_for`（claude→codex+deepseek、codex→claude+deepseek、deepseek→codex+claude、不明→3 人とも。`config.local.sh` で上書きできる）。
 DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deepseek の PR には `author:deepseek` label を付けると確実。
 `no-cross-review` label の PR と draft は watch が飛ばす。
 

@@ -13,7 +13,7 @@
 ## 1. PR を作るとき
 
 - `gh pr create` に必ず `--label author:<自分の名前>` を付ける。レビュアーの振り分けに使う
-  （claude の PR → codex、codex の PR → claude、deepseek の PR → codex と claude）。
+  （claude の PR → codex と deepseek、codex の PR → claude と deepseek、deepseek の PR → codex と claude）。
   自分の PR を自分がレビューすることは無い（作者と同じエージェントはレビュアーから必ず外れる）。label が無いと
   作者を推定できず、自分もレビュアーに入りうるので、label は必ず付ける。
 - レビューは自動で始まる（cron が毎分、未レビューの PR を探す）。急ぐときだけ自分で

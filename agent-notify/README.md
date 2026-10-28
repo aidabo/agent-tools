@@ -31,6 +31,12 @@ A separate tmux session, `agents-monitor`, shows the cross-review status and wha
 - below that, one line per session with each AI pane (claude / codex / deepseek, found from the pane's processes): 作業中 / 確認待ち (dialog or permission prompt) / 入力途中 / 待機
 - `python3 status.py --once` prints the board once; `AGENTS_MONITOR_SESSION` changes the session name
 
+## Turning Discord off / on
+
+`"enabled": false` in the `default` block of `~/.notify/stop-notify.json` stops every route that doesn't set its own
+`enabled` (routes registered by `start-agents.sh` don't), so nothing is sent while the hooks keep running.
+Set it back to `true` (or remove it) to send again. `doctor` shows such routes as `[DISABLED]`.
+
 ## Common actions
 
 - `install` — copy the assets into `~/.notify`

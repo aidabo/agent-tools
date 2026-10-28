@@ -751,7 +751,8 @@ else:
         match = route.get("match", {})
         webhook_env = route.get("webhook_env", default_env)
         mention = route.get("mention", "")
-        enabled = route.get("enabled", True)
+        # same fallback as the hook: a route without "enabled" follows default.enabled
+        enabled = route.get("enabled", default.get("enabled", True))
         status = "DISABLED" if enabled is False else ("OK" if env.get(webhook_env) else "MISSING")
         target = f"{match.get('session','*')}:{match.get('window','*')}.{match.get('pane_index','*')}"
         pane_id = match.get("pane_id", match.get("pane", ""))

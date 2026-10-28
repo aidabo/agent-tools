@@ -143,6 +143,7 @@ if [[ "$do_test" == 1 ]]; then
   mapfile -t pkg_dirs < <(printf '%s\n' "${pkg_dirs[@]}" | sort -u | sed '/^$/d')
   test_summary=""
   : > "$work/tests.log"
+  echo "tests $(date +%s)" > "$work/phase"     # status.py が「テスト中 0:42」を出すのに使う
   while IFS= read -r cmd; do
     [[ -z "$cmd" ]] && continue
     if [[ "$cmd" == *"{HOST_FILES}"* ]]; then
@@ -189,6 +190,24 @@ APPROVE / CHANGES_REQUESTED / COMMENT のどれか 1 語と、理由 1 行
 EOF
 
 # ── レビュアー実行 ─────────────────────────────────────────
+# claude -p は stream-json で動かし、イベントを $work/<reviewer>.events.jsonl に残す（status.py が「何を読んでいるか」を出す）。
+# レポート本文は最後の result イベントから取る。
+stream_result() {
+  python3 -c '
+import json, sys
+text = None
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    try:
+        e = json.loads(line)
+    except ValueError:
+        continue
+    if e.get("type") == "result" and e.get("subtype") == "success":
+        text = e.get("result")
+if not text:
+    sys.exit(1)
+sys.stdout.write(text if text.endswith("\n") else text + "\n")' "$1"
+}
+
 run_reviewer() {
   local who="$1" out="$2"
   # レビュアーであることを示す。PROTOCOL.md はこのとき inbox を見ない・PR を作らないと定める。
@@ -201,7 +220,8 @@ run_reviewer() {
       (cd "$wt" && unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDECODE \
         CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
-        --disallowedTools "Edit,Write,NotebookEdit" > "$out")
+        --disallowedTools "Edit,Write,NotebookEdit" --output-format stream-json --verbose \
+        > "$work/$who.events.jsonl" < /dev/null) && stream_result "$work/$who.events.jsonl" > "$out"
       ;;
     deepseek)
       # 起動スクリプト（ユーザー自身のファイル）の export/unset 行だけを eval する。
@@ -209,17 +229,21 @@ run_reviewer() {
       (cd "$wt" && unset ANTHROPIC_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && set -a && eval "$(grep -E '^(export|unset) ' "$DEEPSEEK_LAUNCHER")" && set +a && \
         timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
-        --disallowedTools "Edit,Write,NotebookEdit" > "$out")
+        --disallowedTools "Edit,Write,NotebookEdit" --output-format stream-json --verbose \
+        > "$work/$who.events.jsonl" < /dev/null) && stream_result "$work/$who.events.jsonl" > "$out"
       ;;
     codex)
-      timeout "$REVIEW_TIMEOUT" codex exec -C "$wt" --sandbox read-only --skip-git-repo-check \
-        -o "$out" "$prompt" > "$work/codex.stdout" 2>&1
+      # --json: イベント（実行中のコマンドなど）を $work/codex.events.jsonl に。本文は -o のファイル
+      timeout "$REVIEW_TIMEOUT" codex exec -C "$wt" --sandbox read-only --skip-git-repo-check --json \
+        -o "$out" "$prompt" > "$work/codex.events.jsonl" 2> "$work/codex.stderr" < /dev/null
       ;;
     *) echo "unknown reviewer: $who" > "$out"; return 1 ;;
   esac
 }
 
 pids=(); outs=()
+rm -f "$work"/*.events.jsonl
+echo "review $(date +%s)" > "$work/phase"
 for r in "${pending[@]}"; do
   out="$REPORT_DIR/$repo_name-pr$pr-$short-$r.md"
   log "reviewing with $r → $out"

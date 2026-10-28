@@ -125,6 +125,66 @@ def summarize_report(path: Path) -> dict:
     return {"verdict": verdict or "?", "sev": sev, "tests_failed": tests_failed, "author": author}
 
 
+def mmss(sec: float) -> str:
+    sec = int(max(sec, 0))
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def short_cmd(cmd: str) -> str:
+    m = re.match(r"""^/bin/(?:ba)?sh -lc ['"](.*)['"]$""", cmd.strip())
+    return (m.group(1) if m else cmd).strip()
+
+
+def last_action(events: Path) -> tuple[str, int]:
+    """(what the reviewer did last, number of tool steps) from a claude stream-json or codex --json file."""
+    last, steps = "starting", 0
+    for line in events.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if e.get("type") == "assistant":                                  # claude
+            for part in (e.get("message") or {}).get("content") or []:
+                if part.get("type") == "tool_use":
+                    steps += 1
+                    inp = part.get("input") or {}
+                    arg = inp.get("file_path") or inp.get("pattern") or inp.get("command") or ""
+                    last = f"{part.get('name')} {Path(arg).name if inp.get('file_path') else arg}".strip()
+                elif part.get("type") == "text":
+                    last = "writing"
+        elif e.get("type") == "result":
+            last = "finishing"
+        item = e.get("item") or {}                                         # codex
+        if e.get("type") == "item.started" and item.get("type") == "command_execution":
+            steps += 1
+            last = short_cmd(item.get("command") or "")
+        elif e.get("type") == "item.completed" and item.get("type") == "agent_message":
+            last = "thinking"
+    return last, steps
+
+
+def review_progress(wt: str) -> str:
+    """What a running review is doing, from <worktree>/.cross-review written by cross-review.sh."""
+    work = Path(wt) / ".cross-review"
+    try:
+        phase, start = (work / "phase").read_text().split()[:2]
+        start_ts = float(start)
+    except (OSError, ValueError):
+        return "starting"
+    now = time.time()
+    if phase == "tests":
+        return f"running tests {mmss(now - start_ts)}"
+    parts = []
+    for ev in sorted(work.glob("*.events.jsonl")):
+        who = ev.name.split(".")[0]
+        last, steps = last_action(ev)
+        quiet = now - ev.stat().st_mtime
+        alive = f"{GREEN}active{RESET}" if quiet < 45 else f"{YELLOW}quiet {mmss(quiet)}{RESET}"
+        parts.append(f"{CYAN}{who}{RESET} {fit(last, 34).rstrip()} · {steps} steps · {alive}")
+    elapsed = f"{mmss(now - start_ts)}"
+    return (" | ".join(parts) + f" · {elapsed}") if parts else f"starting reviewers {elapsed}"
+
+
 def inbox_for(inbox: Path, repo: str, num: int) -> list[tuple[str, bool]]:
     """(author agent, notified) for review pointers still waiting in an author's inbox."""
     out = []
@@ -178,7 +238,7 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
         elif f" {author_login} " not in trusted:
             key, note = "skipped", f"author {author_login} not trusted"
         elif (repo, str(num)) in running:
-            key = "running"
+            key, note = "running", review_progress(cfg.get("wt", ""))
         elif not reviews:
             key, note = "waiting", "next cron pass"
         else:
@@ -205,19 +265,19 @@ def render_line(it: dict, repo_w: int) -> str:
     # who wrote it → who reviewed it, e.g. "codex → claude ✓ 低2"
     pending = it["key"] in ("waiting", "running")
     who = f"{it['agent'] or '?'} → " + (reviewer_cells(it["reviews"]) or f"{DIM}{'…' if pending else '—'}{RESET}")
-    note = f"  {DIM}{it['note']}{RESET}" if it["note"] else ""
+    note = (f"  {it['note']}" if it["key"] == "running" else f"  {DIM}{it['note']}{RESET}") if it["note"] else ""
     when = f"{DIM}{ago(it['when']):>7}{RESET}" if it["when"] else " " * 7
     return f"{head}{title}  {when}  {who}{note}"
 
 
 def main() -> int:
-    repos = [line.split("|") for line in os.environ.get("CR_REPOS", "").splitlines() if "|" in line]
+    repos = [(line.split("|") + [""])[:3] for line in os.environ.get("CR_REPOS", "").splitlines() if "|" in line]
     base = {k: os.environ.get(f"CR_{k.upper()}", "") for k in ("state_dir", "report_dir", "inbox_dir", "trusted")}
     done_days = float(os.environ.get("CROSS_REVIEW_DONE_DAYS", "1"))
     running = running_reviews()
     items, errors = [], []
-    for name, gh_repo in repos:
-        cfg = dict(base, name=name, trusted=base["trusted"] or gh_repo.split("/")[0])
+    for name, gh_repo, wt in repos:
+        cfg = dict(base, name=name, wt=wt, trusted=base["trusted"] or gh_repo.split("/")[0])
         res = subprocess.run(
             ["gh", "pr", "list", "-R", gh_repo, "--state", "all", "-L", "40", "--json",
              "number,title,state,headRefOid,isDraft,labels,isCrossRepository,author,updatedAt,mergedAt,closedAt"],
@@ -232,7 +292,7 @@ def main() -> int:
     cutoff = time.time() - done_days * 86400
     done_items = sorted((i for i in items if i["key"] in ("merged", "closed") and i["when"] >= cutoff),
                         key=lambda i: -i["when"])
-    repo_w = max([width(n) for n, _ in repos] or [10])
+    repo_w = max([width(n) for n, _, _ in repos] or [10])
 
     counts = {k: sum(1 for i in open_items if i["key"] == k) for k in OPEN_ORDER}
     summary = " · ".join(f"{STATES[k][1]}{counts[k]} {STATES[k][0].lower()}{RESET}"

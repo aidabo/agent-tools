@@ -15,8 +15,8 @@ source "$here/config.sh"
 
 repos=""
 for entry in "${REPOS[@]}"; do
-  IFS='|' read -r name gh_repo _ _ <<<"$entry"
-  repos+="$name|$gh_repo"$'\n'
+  IFS='|' read -r name gh_repo _ wt <<<"$entry"
+  repos+="$name|$gh_repo|$wt"$'\n'
 done
 
 # 巡回（cron の watch.sh）

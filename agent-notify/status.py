@@ -143,7 +143,9 @@ class ReviewStatus:
                 lines = [f"{RED}cross-review: {exc}{RESET}"]
             with self.lock:
                 self.lines, self.updated = lines, time.time()
-            self.wake.wait(self.interval)
+            # while a review runs, refresh fast so its progress (current step, active/quiet) moves
+            busy = any("IN REVIEW" in ANSI.sub("", line) for line in lines[1:])
+            self.wake.wait(min(5.0, self.interval) if busy else self.interval)
             self.wake.clear()
 
     def render(self) -> list[str]:

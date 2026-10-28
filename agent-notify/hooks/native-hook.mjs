@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -432,8 +432,12 @@ function mergeAdditive(base, extra) {
   return output;
 }
 
-async function collectAugmentation(root, payload) {
-  const augmentDir = join(root, '.clawhip/hooks/augment');
+// Augment modules are code that runs on every hook, so they load only from the user's own
+// ~/.notify/augment — never from the repo being worked on (a cloned repo could plant one).
+const AUGMENT_DIR = join(os.homedir(), '.notify', 'augment');
+
+async function collectAugmentation(payload) {
+  const augmentDir = AUGMENT_DIR;
   if (!existsSync(augmentDir)) return null;
 
   let merged = {};
@@ -1264,20 +1268,22 @@ function appendStopDispatchLog(message) {
   } catch {}
 }
 
-function writeDiscordDispatchJob(job) {
+// Job files carry the webhook URL, so only the owner may read them.
+function writePrivateJob(dir, job) {
   const jobId = `${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}`;
-  const jobPath = join(DISCORD_DISPATCH_DIR, `${jobId}.json`);
-  mkdirSync(DISCORD_DISPATCH_DIR, { recursive: true });
-  writeFileSync(jobPath, JSON.stringify(job, null, 2) + '\n');
+  const jobPath = join(dir, `${jobId}.json`);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { chmodSync(dir, 0o700); } catch {}
+  writeFileSync(jobPath, JSON.stringify(job, null, 2) + '\n', { mode: 0o600 });
   return jobPath;
 }
 
+function writeDiscordDispatchJob(job) {
+  return writePrivateJob(DISCORD_DISPATCH_DIR, job);
+}
+
 function writeStopDispatchJob(job) {
-  const jobId = `${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}`;
-  const jobPath = join(STOP_DISPATCH_DIR, `${jobId}.json`);
-  mkdirSync(STOP_DISPATCH_DIR, { recursive: true });
-  writeFileSync(jobPath, JSON.stringify(job, null, 2) + '\n');
-  return jobPath;
+  return writePrivateJob(STOP_DISPATCH_DIR, job);
 }
 
 function launchDiscordDispatchWorker(jobPath) {
@@ -1389,8 +1395,11 @@ for (const [index, payload] of (Array.isArray(job.payloads) ? job.payloads.entri
   }
 }
 appendLog(logPath, 'dispatch complete ok=' + okCount + ' failed=' + failCount);
-// Clean up PID file on completion
+// Clean up PID file on completion; drop the job (it holds the webhook URL) once everything was sent
 try { require('node:fs').unlinkSync(pidPath); } catch {}
+if (failCount === 0) {
+  try { require('node:fs').unlinkSync(jobPath); } catch {}
+}
 `;
 
   const child = spawn(
@@ -2105,7 +2114,7 @@ async function main() {
     }
   }
 
-  const augmentation = await collectAugmentation(repoRoot, payload);
+  const augmentation = await collectAugmentation(payload);
   if (augmentation) {
     payload.augmentation = augmentation;
   }

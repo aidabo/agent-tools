@@ -37,8 +37,19 @@ reviewers_for() {
 # fork からの PR はここに関係なく扱わない（PR のコードを実行し、レビューは公開されるため）。
 TRUSTED_AUTHORS=""
 
+# 1 つの PR を自動でレビューする回数の上限（初回 + 再レビュー）。超えたら止めて、ユーザーの判断を待つ
+# （ボードは NEEDS YOU、作者には止めるよう通知）。続けるときは cross-review.sh <repo> <PR> --force。
+MAX_ROUNDS=4
+# deepseek でレビューするときの思考量（起動スクリプトの CLAUDE_CODE_EFFORT_LEVEL を上書き。pane の deepseek は変えない）
+DEEPSEEK_REVIEW_EFFORT="high"
+
+# 作者の pane に「レビューが届きました」を送るか（1=送る）。テストでは 0 にする（本物の pane に送らないように）
+NOTIFY=1
+
 # レビュー結果を PR コメントにも出すか（1=出す）
 POST_COMMENT=1
+# レビューとテストの優先度（nice。大きいほど低い）。pane で動いているエージェントの作業を先にする
+REVIEW_NICE=10
 # レビュアー 1 人あたりの上限秒
 REVIEW_TIMEOUT=1500
 # テスト 1 コマンドあたりの上限秒

@@ -10,6 +10,7 @@ here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # shellcheck source=config.sh
 source "$here/config.sh"
 log() { echo "[notify] $*" >&2; }
+[[ "${NOTIFY:-1}" == 1 ]] || exit 0
 
 # エージェントのプロセス（pane のシェルの子）を探し、"pane_id agent_pid" を出す
 panes_of() {

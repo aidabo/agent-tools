@@ -35,6 +35,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 ```
 
 状態: WAITING（次の巡回でレビュー）→ IN REVIEW → CHANGES REQUESTED（作者が直して push すると WAITING に戻る）/
+NEEDS YOU（回数の上限で止めた。マージするかはあなたが決める）/
 REVIEWED（コメントだけ）/ APPROVED（GitHub でマージしてよい）。SKIPPED は draft・`no-cross-review`・fork・信頼外の作者。
 テストが失敗した PR は CHANGES REQUESTED。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 1 日）。
 各行の `作者 → レビュアー ✓/✗/~ 指摘数` の作者は `author:` label か、レポートの author 行。
@@ -70,6 +71,24 @@ IN REVIEW の行には、いま何をしているかが出る: `running tests 0:
    そのエージェントのセッションが閉じた・再起動したら、新しいセッションに送り直す。作者は `PROTOCOL.md` に従って直す。
 
 同じ PR head × レビュアーは二度レビューしない（`~/.cache/cross-review/state/`）。push で head が変われば再レビュー。
+
+## 終わらないレビューを防ぐ
+
+- **再レビューは前回の続き。** 前回レビューした head があれば、前回のレビューと前回からの差分（`since-last.patch`）を
+  レビュアーに渡し、「前回の指摘が直ったか」と「前回からの変更で壊れたところ」だけを見させる。前回からあった部分への
+  新しい指摘は [高] だけ。直すたびに新しい中・低の指摘が出て終わらない、を防ぐ。
+- **回数の上限。** 1 つの PR の自動レビューは `MAX_ROUNDS`（既定 4 = 初回 + 再レビュー 3 回）まで。超えたら止めて、
+  ボードに `◆ NEEDS YOU` を出し、作者には修正・push をやめるよう 1 回だけ通知する（`*-limit.txt`）。
+  続けるときは `cross-review.sh <repo> <PR> --force`、またはそのまま GitHub でマージする。
+- **全員が APPROVE なら作者は push しない**（`PROTOCOL.md`）。低の指摘は PR コメントで「後で」と書くだけ。
+
+## pane の作業を邪魔しない
+
+- レビューは pane の外の別プロセス（`claude -p` / `codex exec`）で動く。pane に入力しない（サブエージェントと同じ考え方）。
+- 作者への通知は、その pane が手すき（作業中の表示が無く、入力欄が空）のときだけ 1 行送る。
+- テストとレビュアーは `nice`（`REVIEW_NICE`、既定 10）で動かし、pane で動いているエージェントの CPU を先にする。
+- deepseek でレビューするときは思考量を `DEEPSEEK_REVIEW_EFFORT`（既定 high）にする。pane の deepseek（max）は変えない。
+- テストで動かすときは `NOTIFY=0` にする（本物の pane に通知を送らないように）。
 
 ## 信頼できる PR だけ
 

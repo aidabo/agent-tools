@@ -8,6 +8,7 @@ One line per PR, newest first. Open PRs on top:
   CHANGES REQUESTED  a reviewer asked for changes — the author fixes and pushes (then it is WAITING again)
   REVIEWED           reviewed with comments only
   APPROVED           every reviewer approved — merge it on GitHub
+  NEEDS YOU          reviewed MAX_ROUNDS times and still changing — automatic review stopped, you decide
   SKIPPED            draft / no-cross-review label / from a fork / author not trusted
 
 Below, PRs merged or closed in the last CROSS_REVIEW_DONE_DAYS days (default 1), at most 6.
@@ -37,6 +38,7 @@ RED, GREEN, YELLOW, CYAN, MAGENTA, PURPLE = (c("\033[31m"), c("\033[32m"), c("\0
                                              c("\033[35m"), c("\033[38;5;141m"))
 
 STATES = {  # key: (label, color, icon)
+    "needs_you": ("NEEDS YOU", YELLOW + BOLD, "◆"),
     "changes": ("CHANGES REQUESTED", RED + BOLD, "●"),
     "running": ("IN REVIEW", CYAN, "●"),
     "waiting": ("WAITING", YELLOW, "●"),
@@ -46,7 +48,7 @@ STATES = {  # key: (label, color, icon)
     "merged": ("MERGED", PURPLE, "✓"),
     "closed": ("CLOSED", DIM + RED, "✕"),
 }
-OPEN_ORDER = ["changes", "running", "waiting", "reviewed", "approved", "skipped"]
+OPEN_ORDER = ["needs_you", "changes", "running", "waiting", "reviewed", "approved", "skipped"]
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -239,6 +241,9 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
             key, note = "skipped", f"author {author_login} not trusted"
         elif (repo, str(num)) in running:
             key, note = "running", review_progress(cfg.get("wt", ""))
+        elif not reviews and (Path(cfg["state_dir"]) / f"{repo}-{num}.limit").exists():
+            rounds = len({p.name.split("-")[-2] for p in Path(cfg["state_dir"]).glob(f"{repo}-{num}-*.done")})
+            key, note = "needs_you", f"{rounds} rounds, review stopped — merge on GitHub, or cross-review.sh {repo} {num} --force"
         elif not reviews:
             key, note = "waiting", "next cron pass"
         else:

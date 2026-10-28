@@ -107,6 +107,36 @@ for r in "${reviewers[@]}"; do
 done
 [[ ${#pending[@]} -gt 0 ]] || { log "nothing to do"; exit 0; }
 
+# ── 回数の上限 ─────────────────────────────────────────────
+# この PR でレビュー済みの head（今回の head を除く）が MAX_ROUNDS 以上なら、もう自動ではレビューしない。
+# 直すたびに新しい指摘が出て終わらないのを止め、ユーザーに判断を渡す。作者には 1 回だけ止めるよう伝える。
+REPORT_DIR="$(report_dir_for "$src")"
+mapfile -t reviewed_heads < <(ls -t "$STATE_DIR" 2>/dev/null | sed -n "s/^$repo_name-$pr-\([0-9a-f]\{8\}\)-[a-z]*\.done\$/\1/p" | awk '!seen[$0]++' | grep -vx "$short")
+if [[ "$force" == 0 && ${#reviewed_heads[@]} -ge "$MAX_ROUNDS" ]]; then
+  log "PR #$pr ($repo_name): ${#reviewed_heads[@]} rounds already (MAX_ROUNDS=$MAX_ROUNDS) — not reviewing $short; the owner decides"
+  limit_file="$STATE_DIR/$repo_name-$pr.limit"
+  if [[ ! -e "$limit_file" ]]; then
+    echo "$short ${#reviewed_heads[@]}" > "$limit_file"
+    notice="$REPORT_DIR/$repo_name-pr$pr-$short-limit.md"
+    mkdir -p "$REPORT_DIR"
+    { echo "# cross-review: $repo_name PR #$pr — 自動レビューの回数の上限"
+      echo
+      echo "- head: \`$head_sha\` / author: $author / reviewed: $(date '+%Y-%m-%d %H:%M %Z')"
+      echo
+      echo "## 判定"
+      echo "COMMENT — ${#reviewed_heads[@]} 回レビューしたので自動レビューを止めました。マージするかはユーザーが決めます。"
+      echo
+      echo "## 指摘"
+      echo "- なし（この PR への修正・push はユーザーの判断が出るまでしないでください）"; } > "$notice"
+    if [[ "$author" != unknown ]]; then
+      mkdir -p "$INBOX_DIR/$author"
+      echo "$notice" > "$INBOX_DIR/$author/$repo_name-pr$pr-$short-limit.txt"
+    fi
+  fi
+  exit 0
+fi
+prev_short="${reviewed_heads[0]:-}"     # 一番新しくレビューした head（再レビューの起点）
+
 # ── レビュー用 worktree（detach、作者のツリーは動かさない）──────────
 git -C "$src" fetch -q origin "$head_sha" "$base_ref" 2>/dev/null || git -C "$src" fetch -q origin
 if [[ ! -e "$wt/.git" ]]; then
@@ -136,6 +166,23 @@ else
 fi
 work="$wt/.cross-review"; mkdir -p "$work"
 git -C "$wt" diff "$merge_base" "$head_sha" > "$work/diff.patch"
+# 再レビューなら、前回のレビューと前回からの差分を worktree の中に置く（レビュアーは worktree の外を読めない）
+rm -f "$work"/prev-review-*.md "$work/since-last.patch"
+rereview_note=""
+if [[ -n "$prev_short" ]] && git -C "$wt" rev-parse -q --verify "$prev_short^{commit}" >/dev/null; then
+  git -C "$wt" diff "$prev_short" "$head_sha" > "$work/since-last.patch"
+  for f in "$REPORT_DIR/$repo_name-pr$pr-$prev_short-"*.md; do
+    [[ -e "$f" && "$f" != *-limit.md ]] || continue
+    who="${f##*-}"; cp "$f" "$work/prev-review-${who%.md}.md"
+  done
+  rereview_note="
+## これは再レビュー（前回 $prev_short からの続き）
+- 前回のレビュー: \`.cross-review/prev-review-*.md\`、前回からの差分: \`.cross-review/since-last.patch\`
+- 見るのは 2 つだけ: (1) 前回の指摘が直ったか (2) since-last.patch の変更で壊れたところ。
+- 前回の時点からあった部分への新しい指摘は、[高] のときだけ書く（中・低は書かない）。
+- 前回の指摘が直っていて、新しい [高] が無ければ APPROVE。"
+  log "re-review since $prev_short ($(grep -c '^diff --git' "$work/since-last.patch") files changed since then)"
+fi
 mapfile -t changed < <(git -C "$wt" diff --name-only "$merge_base" "$head_sha")
 log "changed files: ${#changed[@]}"
 
@@ -165,7 +212,7 @@ if [[ "$do_test" == 1 ]]; then
     log "test: $cmd"
     echo "\$ $cmd" >> "$work/tests.log"
     set +e
-    (cd "$wt" && timeout "$TEST_TIMEOUT" bash -c "$cmd") >> "$work/tests.log" 2>&1
+    (cd "$wt" && nice -n "$REVIEW_NICE" timeout "$TEST_TIMEOUT" bash -c "$cmd") >> "$work/tests.log" 2>&1
     rc=$?
     set -e
     test_summary+="- exit=$rc: $cmd"$'\n'
@@ -187,6 +234,7 @@ cat > "$prompt_file" <<EOF
 $test_summary
 観点: 正しさ・既存挙動の回帰・セキュリティ（秘密の値の混入、認証境界）・テスト不足・規約違反。
 推測ではなく、コードで確かめた指摘だけを書いてください。好みの問題は書かないでください。
+$rereview_note
 
 出力形式（Markdown、これ以外は書かない）:
 ## 判定
@@ -229,7 +277,7 @@ run_reviewer() {
       # サブスクのログインで動かす。API キーや親の Claude Code セッションの環境は渡さない
       # （ANTHROPIC_API_KEY があるとそちらが優先され、無効なら "Invalid API key" で落ちる）。
       (cd "$wt" && unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDECODE \
-        CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
+        CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && nice -n "$REVIEW_NICE" timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
         --restricted --strict-mcp-config --permission-mode dontAsk --tools "Read,Grep,Glob,Bash" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
         --output-format stream-json --verbose \
@@ -238,8 +286,8 @@ run_reviewer() {
     deepseek)
       # 起動スクリプト（ユーザー自身のファイル）の export/unset 行だけを eval する。
       # 鍵を別ファイルに複製しないため。外部入力は通らない。
-      (cd "$wt" && unset ANTHROPIC_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && set -a && eval "$(grep -E '^(export|unset) ' "$DEEPSEEK_LAUNCHER")" && set +a && \
-        timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
+      (cd "$wt" && unset ANTHROPIC_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && set -a && eval "$(grep -E '^(export|unset) ' "$DEEPSEEK_LAUNCHER")" && set +a && export CLAUDE_CODE_EFFORT_LEVEL="$DEEPSEEK_REVIEW_EFFORT" && \
+        nice -n "$REVIEW_NICE" timeout "$REVIEW_TIMEOUT" claude -p "$prompt" \
         --restricted --strict-mcp-config --permission-mode dontAsk --tools "Read,Grep,Glob,Bash" \
         --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)" \
         --output-format stream-json --verbose \
@@ -247,7 +295,7 @@ run_reviewer() {
       ;;
     codex)
       # --json: イベント（実行中のコマンドなど）を $work/codex.events.jsonl に。本文は -o のファイル
-      timeout "$REVIEW_TIMEOUT" codex exec -C "$wt" --sandbox read-only --skip-git-repo-check --json \
+      nice -n "$REVIEW_NICE" timeout "$REVIEW_TIMEOUT" codex exec -C "$wt" --sandbox read-only --skip-git-repo-check --json \
         -o "$out" "$prompt" > "$work/codex.events.jsonl" 2> "$work/codex.stderr" < /dev/null
       ;;
     *) echo "unknown reviewer: $who" > "$out"; return 1 ;;

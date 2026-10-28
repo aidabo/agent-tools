@@ -38,4 +38,4 @@
   （通知の 1 行は notify.sh が、相手が手すきのときだけ送る）。
 - レビュー用 worktree（`01-ghost-front-review`、`11-business-review`）で作業しない。スクリプトが毎回上書きする。
 - 他のエージェントのブランチ・作業ツリーを切り替えない。そこに commit しない。
-- レビュー結果のファイル（`22-temp/reviews/cross/`）を書き換えない。
+- レビュー結果のファイル（`<ワークスペース>/.agent-tools/reviews/`）を書き換えない。

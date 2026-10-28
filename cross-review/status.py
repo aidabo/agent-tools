@@ -271,13 +271,14 @@ def render_line(it: dict, repo_w: int) -> str:
 
 
 def main() -> int:
-    repos = [(line.split("|") + [""])[:3] for line in os.environ.get("CR_REPOS", "").splitlines() if "|" in line]
-    base = {k: os.environ.get(f"CR_{k.upper()}", "") for k in ("state_dir", "report_dir", "inbox_dir", "trusted")}
+    # name|gh repo|review worktree|report dir (per repo: reports live in each repo's workspace)
+    repos = [(line.split("|") + ["", ""])[:4] for line in os.environ.get("CR_REPOS", "").splitlines() if "|" in line]
+    base = {k: os.environ.get(f"CR_{k.upper()}", "") for k in ("state_dir", "inbox_dir", "trusted")}
     done_days = float(os.environ.get("CROSS_REVIEW_DONE_DAYS", "1"))
     running = running_reviews()
     items, errors = [], []
-    for name, gh_repo, wt in repos:
-        cfg = dict(base, name=name, wt=wt, trusted=base["trusted"] or gh_repo.split("/")[0])
+    for name, gh_repo, wt, report_dir in repos:
+        cfg = dict(base, name=name, wt=wt, report_dir=report_dir, trusted=base["trusted"] or gh_repo.split("/")[0])
         res = subprocess.run(
             ["gh", "pr", "list", "-R", gh_repo, "--state", "all", "-L", "40", "--json",
              "number,title,state,headRefOid,isDraft,labels,isCrossRepository,author,updatedAt,mergedAt,closedAt"],
@@ -292,7 +293,7 @@ def main() -> int:
     cutoff = time.time() - done_days * 86400
     done_items = sorted((i for i in items if i["key"] in ("merged", "closed") and i["when"] >= cutoff),
                         key=lambda i: -i["when"])
-    repo_w = max([width(n) for n, _, _ in repos] or [10])
+    repo_w = max([width(r[0]) for r in repos] or [10])
 
     counts = {k: sum(1 for i in open_items if i["key"] == k) for k in OPEN_ORDER}
     summary = " · ".join(f"{STATES[k][1]}{counts[k]} {STATES[k][0].lower()}{RESET}"

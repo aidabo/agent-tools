@@ -6,8 +6,8 @@
 # このツールの置き場所（PROTOCOL.md・inbox の場所をエージェントに伝えるのに使う）
 CROSS_REVIEW_HOME="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
-# レビュー結果の置き場（人が読む・作者エージェントに渡すファイル）
-REPORT_DIR="$HOME/.cache/cross-review/reports"
+# レビュー結果の置き場（人が読む・作者エージェントに渡すファイル）。空なら report_dir_for がリポジトリごとに決める。
+REPORT_DIR=""
 # 同じ PR head × レビュアーを二度レビューしないための記録
 STATE_DIR="$HOME/.cache/cross-review/state"
 # 作者エージェントへの受け渡し箱（inbox/<agent>/ にレビューへのポインタを置く）
@@ -46,6 +46,18 @@ TEST_TIMEOUT=900
 DEEPSEEK_LAUNCHER="$HOME/claw/deepseek"
 # cron から呼ばれたときに PATH の先頭へ足すディレクトリ（: 区切り）。空なら nvm の最新 node を探す。
 EXTRA_PATH=""
+
+# レビュー結果の置き場: REPORT_DIR があればそれ。無ければリポジトリのワークスペース（作業ツリーから上へたどって
+# agents.yaml がある所、例 ~/work/legacy）の .agent-tools/reviews/。どれでもなければ ~/.cache/cross-review/reports。
+report_dir_for() {  # <作者の作業ツリー>
+  if [[ -n "$REPORT_DIR" ]]; then echo "$REPORT_DIR"; return; fi
+  local d="$1"
+  while [[ -n "$d" && "$d" != "/" && "$d" != "." ]]; do
+    if [[ -f "$d/agents.yaml" ]]; then echo "$d/.agent-tools/reviews"; return; fi
+    d="$(dirname "$d")"
+  done
+  echo "$HOME/.cache/cross-review/reports"
+}
 
 _cross_review_local="${CROSS_REVIEW_CONFIG:-$CROSS_REVIEW_HOME/config.local.sh}"
 # shellcheck source=/dev/null

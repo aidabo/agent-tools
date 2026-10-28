@@ -18,6 +18,10 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 
 ## 状態を見る
 
+監視セッション（`agent-notify/monitor.sh`）の上の pane が PR 一覧（`status.sh`）、下の pane がレビューの実況（`live.sh`）:
+巡回の流れ（どの PR・テスト・レビュー開始・完了・コメント・通知）と、実行中のレビューの一歩一歩
+（`▸` ツール実行、`✎` 書いた文、`⚠` 断られた操作、`✓` 完了）。レビュー自体は cron が動かすので、pane を閉じても止まらない。
+
 ```bash
 ./status.sh        # GitHub の PR 一覧のように 1 PR 1 行、新しい順
 ```
@@ -77,14 +81,15 @@ PR のコードはこの PC でテストとして実行され（`.env` も見え
 
 | 何 | どこ |
 |---|---|
-| レビュー結果（本文） | `REPORT_DIR/<repo>-pr<N>-<sha8>-<reviewer>.md`（このマシンは `~/work/legacy/22-temp/reviews/cross/`）と、同じ内容の PR コメント |
+| レビュー結果（本文） | `<ワークスペース>/.agent-tools/reviews/<repo>-pr<N>-<sha8>-<reviewer>.md`（ワークスペース = 作業ツリーから上へたどって `agents.yaml` がある所。例 `~/work/legacy/.agent-tools/reviews/`。`REPORT_DIR` を書けば 1 か所に固定）と、同じ内容の PR コメント |
 | テストのログ | 同じ場所の `<repo>-pr<N>-<sha8>-tests.log` |
 | レビュー済みの印 | `~/.cache/cross-review/state/<repo>-<N>-<sha8>-<reviewer>.done` |
 | 作者への受け渡し | `inbox/<agent>/*.txt`（作者が対応したら消す）、`.notified` |
 | 巡回のログ | `~/.cache/cross-review/watch.log` |
 | 実行中の様子 | レビュー用 worktree の `.cross-review/`（`phase`、`<reviewer>.events.jsonl`。次のレビューで上書き） |
 
-すべてファイルなので、エージェントのセッションが切れても、PC・WSL を再起動しても残る。cron が毎分見直すので、
+すべてこの PC のファイル（と GitHub の PR コメント）で、agent-tools のリポジトリには入れない（公開リポジトリなので、
+private リポジトリのコードを引用するレビューを載せない）。エージェントのセッションが切れても、PC・WSL を再起動しても残る。cron が毎分見直すので、
 途中で止まったレビュー（`.done` が無い）は次の巡回でやり直し、作者が対応していない inbox は新しいセッションに送り直す。
 
 ## 作者の判定（→ レビュアー）

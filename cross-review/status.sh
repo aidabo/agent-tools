@@ -15,8 +15,8 @@ source "$here/config.sh"
 
 repos=""
 for entry in "${REPOS[@]}"; do
-  IFS='|' read -r name gh_repo _ wt <<<"$entry"
-  repos+="$name|$gh_repo|$wt"$'\n'
+  IFS='|' read -r name gh_repo src wt <<<"$entry"
+  repos+="$name|$gh_repo|$wt|$(report_dir_for "$src")"$'\n'
 done
 
 # 巡回（cron の watch.sh）
@@ -32,6 +32,6 @@ else
   cron_line="${R}cron: watch.sh is not in crontab (README「定期実行」)${Z}"
 fi
 
-CR_REPOS="$repos" CR_STATE_DIR="$STATE_DIR" CR_REPORT_DIR="$REPORT_DIR" CR_INBOX_DIR="$INBOX_DIR" \
+CR_REPOS="$repos" CR_STATE_DIR="$STATE_DIR" CR_INBOX_DIR="$INBOX_DIR" \
 CR_TRUSTED="${TRUSTED_AUTHORS:-}" CR_CRON_LINE="$cron_line" \
   exec python3 "$here/status.py"

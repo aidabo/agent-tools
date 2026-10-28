@@ -29,6 +29,7 @@ A separate tmux session, `agents-monitor`, shows the cross-review status and wha
 - `start-agents.sh` creates it in the background; `monitor.sh` creates it if missing and switches to it. `prefix + L` takes you back
 - main part: the cross-review PR list (`../cross-review/status.sh`) — one line per PR like GitHub: state (WAITING / IN REVIEW / CHANGES REQUESTED / REVIEWED / APPROVED, then recently MERGED / CLOSED), title, author → reviewers with verdicts; refreshed every 20 s, `r` refreshes now, `q` closes the board
 - it draws on the alternate screen, so old frames never pile up in tmux scrollback
+- the lower pane, "review — live" (`../cross-review/live.sh`), follows reviews as they happen: each cron pass (which PR, tests, review start, done, comment posted, author notified) and every step of a running review (tool calls, what it writes, refused calls). Reviews themselves run from cron, so closing the pane doesn't stop them
 - below that, one line per session with each AI pane (claude / codex / deepseek, found from the pane's processes): 作業中 / 確認待ち (dialog or permission prompt) / 入力途中 / 待機
 - `python3 status.py --once` prints the board once; `AGENTS_MONITOR_SESSION` changes the session name
 

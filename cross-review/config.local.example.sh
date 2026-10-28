@@ -1,7 +1,8 @@
 # cross-review のマシン・プロジェクト固有の設定。config.local.sh に写して書き換える
 # （config.sh の後に source される。config.local.sh は git に入れない）。
 
-# レビュー結果の置き場（既定: ~/.cache/cross-review/reports）
+# レビュー結果の置き場。既定はリポジトリのワークスペース（agents.yaml がある上位フォルダ）の .agent-tools/reviews/。
+# 1 か所に固定したいときだけ書く。
 # REPORT_DIR="$HOME/work/reviews/cross"
 
 # 対象リポジトリ: 名前|GitHub repo|作者の作業ツリー|レビュー用 worktree（作業ツリーの隣に作られる）

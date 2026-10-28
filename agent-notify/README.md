@@ -26,7 +26,7 @@ Repo-managed notification assets for tmux -> Discord stop notifications.
 A separate tmux session, `agents-monitor`, shows the cross-review status and what each agent is doing — so the work panes stay clean and you look only when you want to. Detailed per-turn notifications go to Discord (stop-notify), not here.
 
 - one board for all workspaces: it lists every tmux session that has AI panes, and cross-review covers every repo in its config
-- `start-agents.sh` creates it in the background; `monitor.sh` creates it if missing and switches to it. `prefix + L` takes you back
+- `start-agents.sh` creates it in the background; `monitor.sh` (`yarn monitor` in a repo whose package.json has `"monitor": "bash <path to>/agent-notify/monitor.sh"`) creates it if missing and switches to it — inside tmux it switches the client, outside it attaches. `prefix + L` takes you back
 - main part: the cross-review PR list (`../cross-review/status.sh`) — one line per PR like GitHub: state (WAITING / IN REVIEW / CHANGES REQUESTED / REVIEWED / APPROVED, then recently MERGED / CLOSED), title, author → reviewers with verdicts; refreshed every 20 s, `r` refreshes now, `q` closes the board
 - it draws on the alternate screen, so old frames never pile up in tmux scrollback
 - the lower pane, "review — live" (`../cross-review/live.sh`), follows reviews as they happen: each cron pass (which PR, tests, review start, done, comment posted, author notified) and every step of a running review (tool calls, what it writes, refused calls). Reviews themselves run from cron, so closing the pane doesn't stop them

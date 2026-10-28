@@ -11,7 +11,10 @@ here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 # shellcheck source=config.sh
 source "$here/config.sh"
 
-[[ "${1:-}" == "--no-color" ]] && export CR_NO_COLOR=1
+#   status.sh <repo> <PR> [--no-color]   その PR のレビューの全回（時刻・head・各レビュアーの判定）と最後のレポート
+for a in "$@"; do [[ "$a" == "--no-color" ]] && export CR_NO_COLOR=1; done
+args=(); for a in "$@"; do [[ "$a" == --* ]] || args+=("$a"); done
+if [[ ${#args[@]} -eq 2 ]]; then export CR_HISTORY="${args[0]}|${args[1]}"; fi
 
 repos=""
 for entry in "${REPOS[@]}"; do

@@ -12,6 +12,8 @@ One line per PR, newest first. Open PRs on top:
   SKIPPED            draft / no-cross-review label / from a fork / author not trusted
 
 Below, PRs merged or closed in the last CROSS_REVIEW_DONE_DAYS days (default 1), at most 6.
+
+With CR_HISTORY="<repo>|<PR>" (status.sh <repo> <PR>): every review round of that PR instead.
 """
 from __future__ import annotations
 
@@ -207,21 +209,43 @@ def reviewer_cells(reviews: dict[str, dict]) -> str:
     return "  ".join(cells)
 
 
+def review_rounds(cfg: dict, repo: str, num: int) -> list[tuple[str, float, dict[str, dict]]]:
+    """Every reviewed head of a PR, oldest first: (sha8, when, {reviewer: report summary})."""
+    rounds: dict[str, tuple[float, dict[str, dict]]] = {}
+    for done in Path(cfg["state_dir"]).glob(f"{repo}-{num}-*.done"):
+        m = re.fullmatch(rf"{re.escape(repo)}-{num}-([0-9a-f]{{8}})-([a-z]+)\.done", done.name)
+        if not m:
+            continue
+        sha, r = m.groups()
+        report = Path(cfg["report_dir"]) / f"{repo}-pr{num}-{sha}-{r}.md"
+        summary = summarize_report(report) if report.is_file() else {
+            "verdict": "?", "sev": {}, "tests_failed": False, "author": ""}
+        when, revs = rounds.get(sha, (0.0, {}))
+        revs[r] = summary
+        rounds[sha] = (max(when, done.stat().st_mtime), revs)
+    return sorted(((sha, w, revs) for sha, (w, revs) in rounds.items()), key=lambda x: x[1])
+
+
+def all_approved(revs: dict[str, dict]) -> bool:
+    return bool(revs) and all(s["verdict"] == "APPROVE" and not s["tests_failed"] for s in revs.values())
+
+
 def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
     repo, num = cfg["name"], pr["number"]
     sha = (pr.get("headRefOid") or "")[:8]
     labels = [l["name"] for l in pr.get("labels") or []]
     author_login = (pr.get("author") or {}).get("login", "")
     agent = next((l.split(":", 1)[1] for l in labels if l.startswith("author:")), "")
-    reviews: dict[str, dict] = {}
-    for done in sorted(Path(cfg["state_dir"]).glob(f"{repo}-{num}-{sha}-*.done")):
-        r = done.name[len(f"{repo}-{num}-{sha}-"):-len(".done")]
-        report = Path(cfg["report_dir"]) / f"{repo}-pr{num}-{sha}-{r}.md"
-        reviews[r] = summarize_report(report) if report.is_file() else {
-            "verdict": "?", "sev": {}, "tests_failed": False, "author": ""}
+    rounds = review_rounds(cfg, repo, num)
+    reviews: dict[str, dict] = next((revs for s, _, revs in rounds if s == sha), {})
+    # when the current head has no review (stopped, skipped, waiting), the last result is the newest earlier round
+    earlier = [r for r in rounds if r[0] != sha]
+    last = earlier[-1] if earlier else None
+    approved = next((r[0] for r in reversed(rounds) if all_approved(r[2])), "")
     inbox = inbox_for(Path(cfg["inbox_dir"]), repo, num)
     # the agent that wrote the PR: author:X label > the reviews' author line > whose inbox got the review
-    agent = agent or next((s["author"] for s in reviews.values() if s["author"] not in ("", "unknown")), "") \
+    agent = agent or next((s["author"] for _, _, revs in rounds for s in revs.values()
+                           if s["author"] not in ("", "unknown")), "") \
         or (inbox[0][0] if inbox else "")
     note = ""
     if pr["state"] == "MERGED":
@@ -242,8 +266,7 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
         elif (repo, str(num)) in running:
             key, note = "running", review_progress(cfg.get("wt", ""))
         elif not reviews and (Path(cfg["state_dir"]) / f"{repo}-{num}.limit").exists():
-            rounds = len({p.name.split("-")[-2] for p in Path(cfg["state_dir"]).glob(f"{repo}-{num}-*.done")})
-            key, note = "needs_you", f"{rounds} rounds, review stopped — merge on GitHub, or cross-review.sh {repo} {num} --force"
+            key, note = "needs_you", f"review stopped — merge on GitHub, or cross-review.sh {repo} {num} --force"
         elif not reviews:
             key, note = "waiting", "next cron pass"
         else:
@@ -259,8 +282,12 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
                 key = "reviewed"
     if key in ("merged", "closed") and inbox:
         note = f"inbox: {inbox[0][0]} {len(inbox)} left"
+    if key in ("needs_you", "skipped") and rounds:
+        extra = f"{len(rounds)} rounds" + (f", all approved at {approved}" if approved else ", never all approved")
+        note = f"{note} · {extra}" if note else extra
     return {"key": key, "when": when, "repo": repo, "num": num, "title": pr.get("title", ""),
-            "agent": agent, "reviews": reviews, "note": note}
+            "agent": agent, "reviews": reviews, "note": note,
+            "last": last if not reviews and key not in ("running",) else None}
 
 
 def render_line(it: dict, repo_w: int) -> str:
@@ -269,16 +296,57 @@ def render_line(it: dict, repo_w: int) -> str:
     title = fit(it["title"], 44)
     # who wrote it → who reviewed it, e.g. "codex → claude ✓ 低2"
     pending = it["key"] in ("waiting", "running")
-    who = f"{it['agent'] or '?'} → " + (reviewer_cells(it["reviews"]) or f"{DIM}{'…' if pending else '—'}{RESET}")
+    if it["reviews"]:
+        cells = reviewer_cells(it["reviews"])
+    elif it.get("last"):
+        cells = f"{DIM}last {it['last'][0]}:{RESET} " + reviewer_cells(it["last"][2])
+    else:
+        cells = f"{DIM}{'…' if pending else '—'}{RESET}"
+    who = f"{it['agent'] or '?'} → " + cells
     note = (f"  {it['note']}" if it["key"] == "running" else f"  {DIM}{it['note']}{RESET}") if it["note"] else ""
     when = f"{DIM}{ago(it['when']):>7}{RESET}" if it["when"] else " " * 7
     return f"{head}{title}  {when}  {who}{note}"
+
+
+def history(repo: str, num: int, gh_repo: str, cfg: dict) -> int:
+    """Every review round of one PR, oldest first — what to look at before deciding."""
+    res = subprocess.run(["gh", "pr", "view", str(num), "-R", gh_repo, "--json", "title,state,headRefOid,commits"],
+                         capture_output=True, text=True)
+    pr = json.loads(res.stdout) if res.returncode == 0 and res.stdout else {}
+    head = (pr.get("headRefOid") or "")[:8]
+    print(f"{BOLD}{repo} #{num}{RESET} {pr.get('title', '')}  {DIM}{pr.get('state', '?')} · head {head or '?'}"
+          f" · {len(pr.get('commits') or [])} commits{RESET}")
+    rounds = review_rounds(cfg, repo, num)
+    if not rounds:
+        print(f"  {DIM}まだレビューされていません{RESET}")
+        return 0
+    for i, (sha, when, revs) in enumerate(rounds, 1):
+        mark = f"{GREEN}all approved{RESET}" if all_approved(revs) else ""
+        cur = f" {BOLD}← head{RESET}" if sha == head else ""
+        print(f"  {i:>2}. {datetime.fromtimestamp(when):%m/%d %H:%M}  {sha}  {reviewer_cells(revs)}  {mark}{cur}")
+    if head and head not in {r[0] for r in rounds}:
+        print(f"  {YELLOW}head {head} はまだレビューされていません（止めた・スキップ・待ち）{RESET}")
+    last_sha = rounds[-1][0]
+    reports = sorted(Path(cfg["report_dir"]).glob(f"{repo}-pr{num}-{last_sha}-*.md"))
+    print(f" 最後のレビュー（{last_sha}）:")
+    for r in reports:
+        print(f"  {r}")
+    approved = next((r[0] for r in reversed(rounds) if all_approved(r[2])), "")
+    print(f" 全員 APPROVE だった最後: {approved or 'なし'}")
+    return 0
 
 
 def main() -> int:
     # name|gh repo|review worktree|report dir (per repo: reports live in each repo's workspace)
     repos = [(line.split("|") + ["", ""])[:4] for line in os.environ.get("CR_REPOS", "").splitlines() if "|" in line]
     base = {k: os.environ.get(f"CR_{k.upper()}", "") for k in ("state_dir", "inbox_dir", "trusted")}
+    if os.environ.get("CR_HISTORY"):                       # status.sh <repo> <PR>
+        want_repo, want_num = os.environ["CR_HISTORY"].split("|")
+        for name, gh_repo, wt, report_dir in repos:
+            if name == want_repo:
+                return history(name, int(want_num), gh_repo, dict(base, report_dir=report_dir))
+        print(f"unknown repo: {want_repo}", file=sys.stderr)
+        return 1
     done_days = float(os.environ.get("CROSS_REVIEW_DONE_DAYS", "1"))
     running = running_reviews()
     items, errors = [], []

@@ -23,8 +23,13 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 （`▸` ツール実行、`✎` 書いた文、`⚠` 断られた操作、`✓` 完了）。レビュー自体は cron が動かすので、pane を閉じても止まらない。
 
 ```bash
-./status.sh        # GitHub の PR 一覧のように 1 PR 1 行、新しい順
+./status.sh                       # GitHub の PR 一覧のように 1 PR 1 行、新しい順
+./status.sh jibunsee-react 393    # その PR のレビューの全回（時刻・head・各レビュアーの判定）と、最後のレポートの場所
 ```
+
+止めた（NEEDS YOU）・スキップした PR は、最新の head にレビューが無くても、最後のレビュー結果
+（`last <sha>: claude ✗ 中1 …`）と「全員 APPROVE だった最後の head」を一覧に出す。マージするかを決めるときは
+`status.sh <repo> <PR>` で全回を見る。
 
 ```
  Open

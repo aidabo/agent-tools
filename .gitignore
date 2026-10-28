@@ -1,2 +1,7 @@
 # cross-review の実行時の受け渡し箱
 cross-review/inbox/
+
+# cross-review のこのマシン用の設定
+cross-review/config.local.sh
+
+__pycache__/

@@ -71,7 +71,7 @@ for agent in claude codex deepseek; do
   pane="$(pick_pane "$agent" "$repo")"
   if [[ -z "$pane" ]]; then log "$agent: pane が見つからない（起動していない）— 保留 ${#fresh[@]} 件"; continue; fi
   if ! pane_is_idle "$pane"; then log "$agent ($pane): 作業中か入力中 — 次の巡回で再試行"; continue; fi
-  msg="cross-review: ${INBOX_DIR/#$HOME/~}/$agent/ にレビューが ${#fresh[@]} 件届きました。~/work/legacy/10-agent-tools/cross-review/PROTOCOL.md の「レビューを受け取る」に従って対応してください。"
+  msg="cross-review: ${INBOX_DIR/#$HOME/~}/$agent/ にレビューが ${#fresh[@]} 件届きました。${CROSS_REVIEW_HOME/#$HOME/~}/PROTOCOL.md の「レビューを受け取る」に従って対応してください。"
   tmux send-keys -t "$pane" -l "$msg"
   sleep "${SENDTMUX_DELAY_SECONDS:-1}"
   tmux send-keys -t "$pane" Enter

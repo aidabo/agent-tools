@@ -52,7 +52,10 @@ head_sha="$(field headRefOid)"
 base_ref="$(field baseRefName)"
 head_ref="$(field headRefName)"
 title="$(field title)"
-[[ "$(field state)" == "OPEN" || "$force" == 1 ]] || die "PR #$pr is not open (use --force)"
+# 巡回が一覧を取った後にマージ・クローズされた PR は、レビューする必要が無いだけ（失敗ではない）
+if [[ "$(field state)" != "OPEN" && "$force" != 1 ]]; then
+  log "skip PR #$pr ($repo_name): already $(field state | tr 'A-Z' 'a-z') — nothing to review"; exit 0
+fi
 short="${head_sha:0:8}"
 
 # ── 信頼できる PR だけを扱う ─────────────────────────────────

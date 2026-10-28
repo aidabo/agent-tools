@@ -88,6 +88,13 @@ PY
 )"
 fi
 [[ ${#reviewers[@]} -gt 0 ]] || read -r -a reviewers <<<"$(reviewers_for "$author")"
+# 作者が自分の PR をレビューすることは決してしない（--reviewer で指定されても、reviewers_for の設定でも外す）
+others=()
+for r in "${reviewers[@]}"; do
+  if [[ "$r" == "$author" ]]; then log "drop reviewer $r: same agent as the author"; else others+=("$r"); fi
+done
+reviewers=("${others[@]}")
+[[ ${#reviewers[@]} -gt 0 ]] || { log "PR #$pr ($repo_name): no reviewer other than the author ($author) — not reviewed"; exit 0; }
 log "PR #$pr ($repo_name) head=$short author=$author reviewers=${reviewers[*]}"
 
 pending=()

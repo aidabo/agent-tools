@@ -14,7 +14,9 @@
 
 - `gh pr create` に必ず `--label author:<自分の名前>` を付ける。レビュアーの振り分けに使う
   （claude の PR → codex、codex の PR → claude、deepseek の PR → codex と claude）。
-- レビューは自動で始まる（cron が 10 分おきに未レビューの PR を探す）。急ぐときだけ自分で
+  自分の PR を自分がレビューすることは無い（作者と同じエージェントはレビュアーから必ず外れる）。label が無いと
+  作者を推定できず、自分もレビュアーに入りうるので、label は必ず付ける。
+- レビューは自動で始まる（cron が毎分、未レビューの PR を探す）。急ぐときだけ自分で
   `~/work/legacy/10-agent-tools/cross-review/cross-review.sh <repo> <PR番号>` を実行してよい。
   repo は `jibunsee-react` / `business-libs`。
 - draft の PR と `no-cross-review` label の PR はレビューされない。

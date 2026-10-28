@@ -1,0 +1,19 @@
+# Panes for `yarn agents` (start-agents.sh). One entry = one tmux pane.
+# Panes have no fixed project or role — give each agent its task in the pane.
+# cli: claude | codex | deepseek | none — the AI CLI started in the pane (none = plain shell).
+#      Exports CROSS_REVIEW_AGENT=<cli> so cross-review (10-agent-tools/cross-review) knows who is who.
+# command: optional override of the launch command.
+# role: shown in the pane title (defaults to the cli name).
+agents:
+  - name: pane1
+    cli: deepseek
+
+  - name: pane2
+    cli: none
+    role: shell
+
+  - name: pane3
+    cli: codex
+
+  - name: pane4
+    cli: claude

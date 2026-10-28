@@ -1,0 +1,21 @@
+{
+  "default": {
+    "webhook_env": "DISCORD_WEBHOOK_URL",
+    "mention": "",
+    "capture_lines": 400,
+    "chunk_size": 1500,
+    "chunk_delay_ms": 1000
+  },
+  "routes": [
+    {
+      "name": "omx-session-0-0",
+      "match": {
+        "session": "omx-session",
+        "window": "0",
+        "pane_index": "0",
+        "title": "main"
+      },
+      "webhook_env": "DISCORD_WEBHOOK_URL"
+    }
+  ]
+}

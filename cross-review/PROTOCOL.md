@@ -18,7 +18,7 @@
   作者を推定できず、自分もレビュアーに入りうるので、label は必ず付ける。
 - レビューは自動で始まる（cron が毎分、未レビューの PR を探す）。急ぐときだけ自分で
   `~/work/legacy/10-agent-tools/cross-review/cross-review.sh <repo> <PR番号>` を実行してよい。
-  repo は `jibunsee-react` / `business-libs`。
+  repo は `jibunsee-react` / `business-libs` / `ghost`（Ghost の fork。テストは走らせず、秘密の値の検査とレビューだけ）。
 - draft の PR と `no-cross-review` label の PR はレビューされない。
 
 ## 2. レビューを受け取る

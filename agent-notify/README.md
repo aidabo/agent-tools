@@ -14,6 +14,7 @@ Repo-managed notification assets for tmux -> Discord stop notifications.
 - one tmux pane per agent in `agents.yaml` (4 agents → 2x2 grid); add or edit entries there to change the panes
 - every pane is a plain shell with the identity env (`CLAWHIP_NOTIFY_*`) exported — start any AI agent in it
 - `cli: claude|codex|deepseek|none` in `agents.yaml` starts that CLI in the pane automatically and exports `CROSS_REVIEW_AGENT=<cli>` for cross-review (`command:` overrides the launch command); `none` leaves a plain shell
+- panes also get `AGENT_TOOLS_HOME` / `CROSS_REVIEW_HOME` (this clone), so `cross-review/PROTOCOL.md` and the inbox resolve wherever the clone lives
 - `deepseek` has no fixed path: the pane's shell resolves it from `PATH` (`~/.bashrc` etc.). If it is not on `PATH`, `export DEEPSEEK_LAUNCHER=/path/to/deepseek` before starting the panes (`config.local.sh` is read by cross-review only, not by the launcher)
 - the hook-log monitor pane is off by default; `start-agents.sh --monitor` adds it back as an extra pane
 - an existing session with the expected pane count is re-attached; `--force` always starts a new one

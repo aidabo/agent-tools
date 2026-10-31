@@ -21,10 +21,11 @@ tmux で複数の AI エージェント（claude / codex / deepseek）を並べ�
 4. リポジトリの package.json に yarn のコマンドを足す（例）:
 
    ```json
-   "agents": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/start-agents.sh\"",
-   "monitor": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/agent-notify/monitor.sh\"",
-   "cross-review:install": "bash \"${AGENT_TOOLS_HOME:-$HOME/work/legacy/10-agent-tools}/cross-review/install.sh\""
+   "agents": "bash \"${AGENT_TOOLS_HOME:?set AGENT_TOOLS_HOME to the agent-tools clone}/agent-notify/start-agents.sh\"",
+   "monitor": "bash \"${AGENT_TOOLS_HOME:?set AGENT_TOOLS_HOME to the agent-tools clone}/agent-notify/monitor.sh\"",
+   "cross-review:install": "bash \"${AGENT_TOOLS_HOME:?set AGENT_TOOLS_HOME to the agent-tools clone}/cross-review/install.sh\""
    ```
 
-   agent-tools を別の場所に clone したマシンでは、シェルの設定（`~/.bashrc` など）に
-   `export AGENT_TOOLS_HOME=/path/to/agent-tools` を書く。スクリプト自身は自分の場所を見るので、パスの設定は要らない。
+   clone の場所はマシンごとに違うので、既定値は持たせない。シェルの設定（`~/.bashrc` など）に
+   `export AGENT_TOOLS_HOME=/path/to/agent-tools` を書く（未設定なら上の例はその場で止まる）。
+   スクリプト自身は自分の場所を見るので、パスを書くのはこの package.json の行だけ。

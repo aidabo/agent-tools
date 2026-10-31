@@ -162,7 +162,7 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
 入る行（例）:
 
 ```
-* * * * * $HOME/work/legacy/10-agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
+* * * * * $HOME/path/to/agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
 ```
 
 ## 各エージェントへの指示
@@ -172,5 +172,5 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
 
 ### 旧メモ
 
-> 作業前に `~/work/legacy/10-agent-tools/cross-review/inbox/<自分>/` を確認し、レビューの指摘を直してから次へ進む。
+> 作業前に `<clone>/inbox/<自分>/` を確認し、レビューの指摘を直してから次へ進む。
 > 読んだポインタは消す。

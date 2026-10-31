@@ -127,8 +127,10 @@ for r in claude codex; do
   fi
 done
 if [[ " $reviewers_used " == *" deepseek "* ]]; then
-  # cron（watch.sh）と同じ PATH で config.sh を読み直し、そこで解決できるか確かめる
-  cron_launcher="$(PATH="$cron_path" bash -c '
+  # cron（watch.sh）と同じ PATH で config.sh を読み直し、そこで解決できるか確かめる。
+  # 今のシェルの DEEPSEEK_LAUNCHER（.bashrc などで export したもの）は cron には無いので、
+  # 引き継がせない。cron と同じく config.local.sh と PATH だけで判断する。
+  cron_launcher="$(env -u DEEPSEEK_LAUNCHER PATH="$cron_path" bash -c '
     set -u
     source "$1/config.sh"
     printf "%s" "${DEEPSEEK_LAUNCHER:-}"

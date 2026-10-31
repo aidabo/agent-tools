@@ -15,7 +15,7 @@ Repo-managed notification assets for tmux -> Discord stop notifications.
 - every pane is a plain shell with the identity env (`CLAWHIP_NOTIFY_*`) exported — start any AI agent in it
 - `cli: claude|codex|deepseek|none` in `agents.yaml` starts that CLI in the pane automatically and exports `CROSS_REVIEW_AGENT=<cli>` for cross-review (`command:` overrides the launch command); `none` leaves a plain shell
 - panes also get `AGENT_TOOLS_HOME` / `CROSS_REVIEW_HOME` (this clone), so `cross-review/PROTOCOL.md` and the inbox resolve wherever the clone lives
-- `deepseek` has no fixed path: the pane's shell resolves it from `PATH` (`~/.bashrc` etc.). If it is not on `PATH`, `export DEEPSEEK_LAUNCHER=/path/to/deepseek` before starting the panes (`config.local.sh` is read by cross-review only, not by the launcher)
+- `deepseek` has no fixed path: the pane's shell resolves it from `PATH` (`~/.bashrc` etc.). If it is not on `PATH`, `export DEEPSEEK_LAUNCHER=/path/to/deepseek` before starting the panes; it is run with `bash`, so it does not need the execute bit (`config.local.sh` is read by cross-review only, not by the launcher)
 - the hook-log monitor pane is off by default; `start-agents.sh --monitor` adds it back as an extra pane
 - an existing session with the expected pane count is re-attached; `--force` always starts a new one
 - workspaces: a workspace is a folder holding several repos (backend, frontend, …), like `~/work/legacy`. Put an `agents.yaml` at its root; `yarn agents` run from any repo inside it walks up, finds that file, starts the panes in the workspace root and keeps notify state in `<workspace>/.omx/notify-state`. Without one, it falls back to two levels above this script and the `agents.yaml` here

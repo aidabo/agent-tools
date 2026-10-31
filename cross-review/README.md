@@ -7,10 +7,10 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 ## 使い方
 
 ```bash
-# 1 本だけ（作者を推定して相手方がレビュー）
-./cross-review.sh jibunsee-react 384
+# 1 本だけ（作者を推定して相手方がレビュー）。repo は config.local.sh の REPOS の名前
+./cross-review.sh <repo> <PR番号>
 # レビュアーを指定 / テストなし / コメントを出さない / 同じ head でもやり直す
-./cross-review.sh business-libs 12 --reviewer claude --reviewer deepseek --no-test --no-post --force
+./cross-review.sh <repo> <PR番号> --reviewer claude --reviewer deepseek --no-test --no-post --force
 
 # 開いている PR を 1 巡（未レビューの head だけ）
 ./watch.sh
@@ -24,7 +24,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 
 ```bash
 ./status.sh                       # GitHub の PR 一覧のように 1 PR 1 行、新しい順
-./status.sh jibunsee-react 393    # その PR のレビューの全回（時刻・head・各レビュアーの判定）と、最後のレポートの場所
+./status.sh <repo> <PR番号>       # その PR のレビューの全回（時刻・head・各レビュアーの判定）と、最後のレポートの場所
 ```
 
 止めた（NEEDS YOU）・スキップした PR は、最新の head にレビューが無くても、最後のレビュー結果

@@ -413,7 +413,14 @@ for agent_idx in "${!AGENT_NAMES[@]}"; do
       codex)    command="codex" ;;
       # 固定パスは持たない。pane の対話シェルが PATH（~/.bashrc など）から
       # deepseek を解決する。PATH に無い場合だけ DEEPSEEK_LAUNCHER で指定する。
-      deepseek) command="$(printf '%q' "${DEEPSEEK_LAUNCHER:-deepseek}")" ;;
+      # DEEPSEEK_LAUNCHER は起動スクリプト（bash）なので、実行ビットが無くても動くよう bash で起動する。
+      deepseek)
+        if [[ -n "${DEEPSEEK_LAUNCHER:-}" ]]; then
+          command="bash $(printf '%q' "$DEEPSEEK_LAUNCHER")"
+        else
+          command="deepseek"
+        fi
+        ;;
       ""|none)  command="" ;;
       *)        echo "[start-agents] WARNING: unknown cli '$cli' for '$name' — leaving a plain shell" >&2 ;;
     esac

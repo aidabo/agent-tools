@@ -20,6 +20,10 @@ for arg in "$@"; do
 done
 
 script_dir="$(dirname "$(readlink -f "$0")")"
+# This clone (…/10-agent-tools). Panes get it, so an agent finds cross-review/PROTOCOL.md
+# and its inbox wherever the clone lives (another workspace, another machine).
+agent_tools_home="$(dirname "$script_dir")"
+cross_review_home="$agent_tools_home/cross-review"
 
 # Workspace = a folder holding several repos (e.g. ~/work/legacy), marked by its agents.yaml.
 # Panes start there and notify state lives in <workspace>/.omx/notify-state.
@@ -293,8 +297,8 @@ build_identity_export() {
   local pane_index="${target##*.}"
   window_index="${window_index%%.*}"
 
-  printf 'export CLAWHIP_NOTIFY_SESSION=%q CLAWHIP_NOTIFY_PANE_ROLE=%q CLAWHIP_NOTIFY_PANE_TARGET=%q CLAWHIP_NOTIFY_PANE_ID=%q CLAWHIP_NOTIFY_PANE_TITLE=%q CLAWHIP_NOTIFY_WINDOW_INDEX=%q CLAWHIP_NOTIFY_PANE_INDEX=%q CLAWHIP_NOTIFY_STATE_ROOT=%q CLAWHIP_NOTIFY_PROJECT_ROOT=%q' \
-    "$session_name" "$role" "$target" "$pane_id" "$title" "$window_index" "$pane_index" "$notify_state_root" "$repo_root"
+  printf 'export CLAWHIP_NOTIFY_SESSION=%q CLAWHIP_NOTIFY_PANE_ROLE=%q CLAWHIP_NOTIFY_PANE_TARGET=%q CLAWHIP_NOTIFY_PANE_ID=%q CLAWHIP_NOTIFY_PANE_TITLE=%q CLAWHIP_NOTIFY_WINDOW_INDEX=%q CLAWHIP_NOTIFY_PANE_INDEX=%q CLAWHIP_NOTIFY_STATE_ROOT=%q CLAWHIP_NOTIFY_PROJECT_ROOT=%q AGENT_TOOLS_HOME=%q CROSS_REVIEW_HOME=%q' \
+    "$session_name" "$role" "$target" "$pane_id" "$title" "$window_index" "$pane_index" "$notify_state_root" "$repo_root" "$agent_tools_home" "$cross_review_home"
 }
 
 # ── Cleanup helper ────────────────────────────────────────────
@@ -399,7 +403,7 @@ for agent_idx in "${!AGENT_NAMES[@]}"; do
   tmux send-keys -t "$pane_id" "$identity_export" C-m
 
   # ── Resolve the AI CLI (agents.yaml `cli:`) ────────────────
-  # cross-review（~/work/legacy/10-agent-tools/cross-review/PROTOCOL.md）は CROSS_REVIEW_AGENT で
+  # cross-review（$CROSS_REVIEW_HOME/PROTOCOL.md。場所は pane に export 済み）は CROSS_REVIEW_AGENT で
   # 自分の名前を知る。CLI は起動時に CLAUDE.md / AGENTS.md を読むので、ここで起動すれば最初から有効。
   cli="${AGENT_CLIS[$agent_idx]:-}"
   command="${AGENT_COMMANDS[$agent_idx]:-}"

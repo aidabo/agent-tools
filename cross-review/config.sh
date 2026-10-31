@@ -55,7 +55,8 @@ REVIEW_TIMEOUT=1500
 # テスト 1 コマンドあたりの上限秒
 TEST_TIMEOUT=900
 # DeepSeek（Claude Code + DeepSeek API）の起動スクリプト。export 行だけを読む。
-DEEPSEEK_LAUNCHER="$HOME/claw/deepseek"
+# 固定パスは持たない: DEEPSEEK_LAUNCHER が未指定なら PATH から解決する（下で）。
+DEEPSEEK_LAUNCHER="${DEEPSEEK_LAUNCHER:-}"
 # cron から呼ばれたときに PATH の先頭へ足すディレクトリ（: 区切り）。空なら nvm の最新 node を探す。
 EXTRA_PATH=""
 
@@ -75,3 +76,10 @@ _cross_review_local="${CROSS_REVIEW_CONFIG:-$CROSS_REVIEW_HOME/config.local.sh}"
 # shellcheck source=/dev/null
 [[ -f "$_cross_review_local" ]] && source "$_cross_review_local"
 unset _cross_review_local
+
+# deepseek の起動スクリプトを PATH から解決する（EXTRA_PATH も見る）。
+# cron は PATH が最小なので、置き場所は config.local.sh の EXTRA_PATH に足すか、
+# DEEPSEEK_LAUNCHER で絶対パスを指定する。見つからなければ空のまま。
+if [[ -z "$DEEPSEEK_LAUNCHER" ]]; then
+  DEEPSEEK_LAUNCHER="$(PATH="${EXTRA_PATH:+$EXTRA_PATH:}$PATH" command -v deepseek 2>/dev/null || true)"
+fi

@@ -24,5 +24,8 @@ test_cmds_for() {
   esac
 }
 
-# cron で node / gh が見つからないとき
-# EXTRA_PATH="$HOME/.nvm/versions/node/v20.19.0/bin"
+# cron で node / gh / deepseek が見つからないとき（PATH に置き場所を足す）
+# EXTRA_PATH="$HOME/.nvm/versions/node/v20.19.0/bin:$HOME/claw"
+
+# deepseek の起動スクリプトが PATH に無いときだけ、絶対パスで指定する（通常は不要）
+# DEEPSEEK_LAUNCHER="$HOME/claw/deepseek"

@@ -407,7 +407,9 @@ for agent_idx in "${!AGENT_NAMES[@]}"; do
     case "$cli" in
       claude)   command="claude" ;;
       codex)    command="codex" ;;
-      deepseek) command="bash $HOME/claw/deepseek" ;;
+      # 固定パスは持たない。pane の対話シェルが PATH（~/.bashrc など）から
+      # deepseek を解決する。PATH に無い場合だけ DEEPSEEK_LAUNCHER で指定する。
+      deepseek) command="$(printf '%q' "${DEEPSEEK_LAUNCHER:-deepseek}")" ;;
       ""|none)  command="" ;;
       *)        echo "[start-agents] WARNING: unknown cli '$cli' for '$name' — leaving a plain shell" >&2 ;;
     esac

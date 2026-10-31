@@ -4,6 +4,7 @@
 # session: tmux session name (default: "<workspace folder>-agents").
 # Panes have no fixed project or role — give each agent its task in the pane.
 # cli: claude | codex | deepseek | none — the AI CLI started in the pane (none = plain shell).
+#      deepseek resolves from PATH; set DEEPSEEK_LAUNCHER if it lives elsewhere.
 #      Exports CROSS_REVIEW_AGENT=<cli> so cross-review (10-agent-tools/cross-review) knows who is who.
 # command: optional override of the launch command.
 # role: shown in the pane title (defaults to the cli name).

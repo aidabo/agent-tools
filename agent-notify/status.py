@@ -66,10 +66,26 @@ def process_children() -> dict[int, list[str]]:
     return children
 
 
+_INTERPRETERS = ("bash", "sh", "dash", "zsh", "node", "python", "python3", "perl", "ruby")
+
+
+def _is_deepseek(args: str) -> bool:
+    """Match the command name, not a fixed path (deepseek may live anywhere)."""
+    launcher = os.environ.get("DEEPSEEK_LAUNCHER", "")
+    if launcher and launcher in args:
+        return True
+    toks = args.split()
+    if not toks:
+        return False
+    if os.path.basename(toks[0]) in _INTERPRETERS and len(toks) > 1:
+        toks = toks[1:]
+    return os.path.basename(toks[0]) == "deepseek"
+
+
 def agent_of(shell_pid: int, children: dict[int, list[str]]) -> str:
     """Which AI CLI runs in the pane (same rules as cross-review/notify.sh)."""
     for args in children.get(shell_pid, []):
-        if "claw/deepseek" in args:
+        if _is_deepseek(args):
             return "deepseek"
         if "bin/codex" in args:
             return "codex"

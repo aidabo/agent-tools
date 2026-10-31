@@ -153,7 +153,10 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
   `~/.cache/cross-review/crontab.bak.<日時>` に残る。何度実行してもよい。
 - 確認すること: cron が動いているか（WSL は `/etc/wsl.conf` の `[boot] systemd=true`）、`config.local.sh`
   （無ければひな形を作る）と `REPOS` の作業ツリー、`git gh python3 flock tmux timeout`、`gh` のログイン、
-  レビュアーの `claude` / `codex` が cron の PATH から見えるか（見えなければ `EXTRA_PATH` に足す）、deepseek の起動スクリプト。
+  レビュアーの `claude` / `codex` / `deepseek` が cron の PATH から見えるか（見えなければ `EXTRA_PATH` に足す）。
+  deepseek の起動スクリプトは PATH から解決する（固定パスは持たない）。見つからないときは `DEEPSEEK_LAUNCHER` で指定する。
+  既存の `config.local.sh` を使っている場合、deepseek を `~/claw` など PATH の外に置いているなら
+  `EXTRA_PATH` にそのディレクトリを足すか、`DEEPSEEK_LAUNCHER` を絶対パスで指定する（以前はソースに固定パスがあったため不要だった）。
 - `claude` / `codex` のログインは確かめられないので、新しいマシンではそれぞれ一度起動してログインしておく。
 
 入る行（例）:

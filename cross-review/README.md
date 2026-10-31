@@ -7,10 +7,10 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 ## 使い方
 
 ```bash
-# 1 本だけ（作者を推定して相手方がレビュー）
-./cross-review.sh jibunsee-react 384
+# 1 本だけ（作者を推定して相手方がレビュー）。repo は config.local.sh の REPOS の名前
+./cross-review.sh <repo> <PR番号>
 # レビュアーを指定 / テストなし / コメントを出さない / 同じ head でもやり直す
-./cross-review.sh business-libs 12 --reviewer claude --reviewer deepseek --no-test --no-post --force
+./cross-review.sh <repo> <PR番号> --reviewer claude --reviewer deepseek --no-test --no-post --force
 
 # 開いている PR を 1 巡（未レビューの head だけ）
 ./watch.sh
@@ -24,7 +24,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 
 ```bash
 ./status.sh                       # GitHub の PR 一覧のように 1 PR 1 行、新しい順
-./status.sh jibunsee-react 393    # その PR のレビューの全回（時刻・head・各レビュアーの判定）と、最後のレポートの場所
+./status.sh <repo> <PR番号>       # その PR のレビューの全回（時刻・head・各レビュアーの判定）と、最後のレポートの場所
 ```
 
 止めた（NEEDS YOU）・スキップした PR は、最新の head にレビューが無くても、最後のレビュー結果
@@ -153,13 +153,16 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
   `~/.cache/cross-review/crontab.bak.<日時>` に残る。何度実行してもよい。
 - 確認すること: cron が動いているか（WSL は `/etc/wsl.conf` の `[boot] systemd=true`）、`config.local.sh`
   （無ければひな形を作る）と `REPOS` の作業ツリー、`git gh python3 flock tmux timeout`、`gh` のログイン、
-  レビュアーの `claude` / `codex` が cron の PATH から見えるか（見えなければ `EXTRA_PATH` に足す）、deepseek の起動スクリプト。
+  レビュアーの `claude` / `codex` / `deepseek` が cron の PATH から見えるか（見えなければ `EXTRA_PATH` に足す）。
+  deepseek の起動スクリプトは PATH から解決する（固定パスは持たない）。見つからないときは `DEEPSEEK_LAUNCHER` で指定する。
+  既存の `config.local.sh` を使っている場合、deepseek を `~/claw` など PATH の外に置いているなら
+  `EXTRA_PATH` にそのディレクトリを足すか、`DEEPSEEK_LAUNCHER` を絶対パスで指定する（以前はソースに固定パスがあったため不要だった）。
 - `claude` / `codex` のログインは確かめられないので、新しいマシンではそれぞれ一度起動してログインしておく。
 
 入る行（例）:
 
 ```
-* * * * * $HOME/work/legacy/10-agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
+* * * * * $HOME/path/to/agent-tools/cross-review/watch.sh >> $HOME/.cache/cross-review/watch.log 2>&1
 ```
 
 ## 各エージェントへの指示
@@ -169,5 +172,5 @@ DeepSeek の Claude Code も `Co-Authored-By: Claude` を付けるので、deeps
 
 ### 旧メモ
 
-> 作業前に `~/work/legacy/10-agent-tools/cross-review/inbox/<自分>/` を確認し、レビューの指摘を直してから次へ進む。
+> 作業前に `<clone>/inbox/<自分>/` を確認し、レビューの指摘を直してから次へ進む。
 > 読んだポインタは消す。

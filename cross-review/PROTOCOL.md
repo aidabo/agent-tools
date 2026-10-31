@@ -7,6 +7,9 @@
 
 - 名前: 環境変数 `CROSS_REVIEW_AGENT`（無ければ Claude Code は `claude`、Codex は `codex`）。
   DeepSeek は Claude Code の上で動くが、起動スクリプトが `CROSS_REVIEW_AGENT=deepseek` を設定する。
+- この決まりは clone した agent-tools の `cross-review/PROTOCOL.md`。pane では `start-agents.sh` が
+  `CROSS_REVIEW_HOME`（= `<clone>/cross-review`）と `AGENT_TOOLS_HOME` を export する。
+  下の `<clone>` はその値、手元ではこのファイルと同じフォルダ。
 - `CROSS_REVIEW_ROLE=reviewer` のときは **レビュアーとして呼ばれている**。この決まりの 1〜3 は行わない
   （inbox を見ない、PR を作らない、ファイルを変更しない）。頼まれたレビューを返すだけ。
 
@@ -17,14 +20,15 @@
   自分の PR を自分がレビューすることは無い（作者と同じエージェントはレビュアーから必ず外れる）。label が無いと
   作者を推定できず、自分もレビュアーに入りうるので、label は必ず付ける。
 - レビューは自動で始まる（cron が毎分、未レビューの PR を探す）。急ぐときだけ自分で
-  `~/work/legacy/10-agent-tools/cross-review/cross-review.sh <repo> <PR番号>` を実行してよい。
-  repo は `jibunsee-react` / `business-libs` / `ghost`（Ghost の fork。テストは走らせず、秘密の値の検査とレビューだけ）。
+  `<clone>/cross-review.sh <repo> <PR番号>` を実行してよい。
+  repo は `cross-review/config.local.sh` の `REPOS` にある名前（ボードに出ている名前）。
+  テストを走らせるかは `config.local.sh` の `test_cmds_for` で決まる（無ければレビューだけ）。
 - draft の PR と `no-cross-review` label の PR はレビューされない。
 
 ## 2. レビューを受け取る
 
 - 「cross-review: … にレビューが N 件届きました」という 1 行が届いたら、または作業の開始時・
-  タスクの区切りに、`~/work/legacy/10-agent-tools/cross-review/inbox/<自分の名前>/` を見る。
+  タスクの区切りに、`<clone>/inbox/<自分の名前>/` を見る。
 - 中の `*.txt` の 1 行目 = レビュー結果のファイル。読んで、
   - **正しい指摘** → その PR のブランチで直して push する（head が変わると自動で再レビューされる）。
   - **同意しない指摘** → 理由を PR コメントに書く（黙って無視しない）。
@@ -48,6 +52,6 @@
 
 - 他のエージェントの tmux pane に send-keys しない。連絡は inbox と PR コメントで行う
   （通知の 1 行は notify.sh が、相手が手すきのときだけ送る）。
-- レビュー用 worktree（`01-ghost-front-review`、`11-business-review`）で作業しない。スクリプトが毎回上書きする。
+- レビュー用 worktree（`REPOS` の 4 列目。作業ツリーの隣に作られる `*-review`）で作業しない。スクリプトが毎回上書きする。
 - 他のエージェントのブランチ・作業ツリーを切り替えない。そこに commit しない。
 - レビュー結果のファイル（`<ワークスペース>/.agent-tools/reviews/`）を書き換えない。

@@ -127,8 +127,21 @@ for r in claude codex; do
   fi
 done
 if [[ " $reviewers_used " == *" deepseek "* ]]; then
-  [[ -f "$DEEPSEEK_LAUNCHER" ]] && ok "deepseek の起動スクリプト: $DEEPSEEK_LAUNCHER" \
-    || warn "deepseek の起動スクリプトがありません: $DEEPSEEK_LAUNCHER（使わないなら config.local.sh の reviewers_for から外す）"
+  # cron（watch.sh）と同じ PATH で config.sh を読み直し、そこで解決できるか確かめる。
+  # 今のシェルの DEEPSEEK_LAUNCHER（.bashrc などで export したもの）は cron には無いので、
+  # 引き継がせない。cron と同じく config.local.sh と PATH だけで判断する。
+  cron_launcher="$(env -u DEEPSEEK_LAUNCHER PATH="$cron_path" bash -c '
+    set -u
+    source "$1/config.sh"
+    printf "%s" "${DEEPSEEK_LAUNCHER:-}"
+  ' _ "$CROSS_REVIEW_HOME" 2>/dev/null)"
+  if [[ -n "$cron_launcher" && -f "$cron_launcher" ]]; then
+    ok "deepseek の起動スクリプト: $cron_launcher（cron からも見つかる）"
+  elif [[ -n "${DEEPSEEK_LAUNCHER:-}" && -f "$DEEPSEEK_LAUNCHER" ]]; then
+    warn "deepseek は今のシェルにはあるが cron からは見つからない（config.local.sh の EXTRA_PATH に $(dirname "$DEEPSEEK_LAUNCHER") を足すか、DEEPSEEK_LAUNCHER を絶対パスで指定）"
+  else
+    warn "deepseek の起動スクリプトが見つかりません（PATH に deepseek を置くか、config.local.sh で DEEPSEEK_LAUNCHER=/path/to/deepseek を指定。使わないなら reviewers_for から外す）"
+  fi
 fi
 echo "  （claude・codex のログイン状態は確認できないので、それぞれ一度起動してログインしておいてください）"
 

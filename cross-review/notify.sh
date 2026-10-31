@@ -12,6 +12,20 @@ source "$here/config.sh"
 log() { echo "[notify] $*" >&2; }
 [[ "${NOTIFY:-1}" == 1 ]] || exit 0
 
+# コマンド行の先頭（bash 経由なら次の語）が deepseek か。固定パスに依存しない。
+is_deepseek_cmd() {
+  local args="${1:-}" first rest
+  # 解決済みの起動スクリプトと一致すれば確実（パスに空白があっても効く）
+  if [[ -n "${DEEPSEEK_LAUNCHER:-}" && "$args" == *"$DEEPSEEK_LAUNCHER"* ]]; then
+    return 0
+  fi
+  read -r first rest <<<"$args"
+  case "${first##*/}" in
+    bash|sh|dash|zsh|node|python|python3|perl|ruby) read -r first rest <<<"${rest:-}" ;;
+  esac
+  [[ "${first##*/}" == deepseek ]]
+}
+
 # エージェントのプロセス（pane のシェルの子）を探し、"pane_id agent_pid" を出す
 panes_of() {
   local want="$1"
@@ -19,7 +33,7 @@ panes_of() {
     ps -o pid=,args= --ppid "$spid" 2>/dev/null | while read -r cpid args; do
       case "$want" in
         codex)    [[ "$args" == *bin/codex* ]] && echo "$id $cpid" ;;
-        deepseek) [[ "$args" == *claw/deepseek* ]] && echo "$id $(ps -o pid= --ppid "$cpid" | head -1 | tr -d ' ')" ;;
+        deepseek) is_deepseek_cmd "$args" && echo "$id $(ps -o pid= --ppid "$cpid" | head -1 | tr -d ' ')" ;;
         claude)   [[ "$args" == claude* ]] && echo "$id $cpid" ;;
       esac
     done

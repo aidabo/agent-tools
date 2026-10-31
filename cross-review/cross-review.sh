@@ -104,9 +104,15 @@ pending=()
 for r in "${reviewers[@]}"; do
   if [[ "$force" == 0 && -f "$STATE_DIR/$repo_name-$pr-$short-$r.done" ]]; then
     log "skip $r: already reviewed $short"
-  else
-    pending+=("$r")
+    continue
   fi
+  # 起動スクリプトが無い deepseek を pending に入れると、毎回テストだけ走って失敗する。
+  # 設定漏れは install.sh が警告するので、ここではログに残して外す。
+  if [[ "$r" == deepseek && ( -z "${DEEPSEEK_LAUNCHER:-}" || ! -f "$DEEPSEEK_LAUNCHER" ) ]]; then
+    log "skip deepseek: launcher not found (PATH or DEEPSEEK_LAUNCHER) — run cross-review/install.sh"
+    continue
+  fi
+  pending+=("$r")
 done
 [[ ${#pending[@]} -gt 0 ]] || { log "nothing to do"; exit 0; }
 
@@ -308,6 +314,17 @@ run_reviewer() {
         > "$work/$who.events.jsonl" < /dev/null) && stream_result "$work/$who.events.jsonl" > "$out"
       ;;
     deepseek)
+      # 起動スクリプトは PATH / DEEPSEEK_LAUNCHER で解決する（固定パスへは落とさない）。
+      if [[ -z "${DEEPSEEK_LAUNCHER:-}" || ! -f "$DEEPSEEK_LAUNCHER" || ! -r "$DEEPSEEK_LAUNCHER" ]]; then
+        echo "deepseek launcher not found/readable: put 'deepseek' on PATH or set DEEPSEEK_LAUNCHER" > "$out"
+        return 1
+      fi
+      # export/unset 行が無いファイルを eval すると空文字になり、素の claude（サブスク）が
+      # 動いて deepseek のレビューとして記録されてしまう。起動スクリプトらしいか先に確かめる。
+      if ! grep -qE '^(export|unset) ' "$DEEPSEEK_LAUNCHER" 2>/dev/null; then
+        echo "not a deepseek launcher (no export/unset lines): $DEEPSEEK_LAUNCHER" > "$out"
+        return 1
+      fi
       # 起動スクリプト（ユーザー自身のファイル）の export/unset 行だけを eval する。
       # 鍵を別ファイルに複製しないため。外部入力は通らない。
       (cd "$wt" && unset ANTHROPIC_API_KEY CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_CHILD_SESSION CLAUDE_CODE_SESSION_ID && set -a && eval "$(grep -E '^(export|unset) ' "$DEEPSEEK_LAUNCHER")" && set +a && export CLAUDE_CODE_EFFORT_LEVEL="$DEEPSEEK_REVIEW_EFFORT" && \

@@ -35,6 +35,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
  Open
   ● CHANGES REQUESTED business-libs  #16  Harden estate ViewModel …   3m ago  codex → claude ✗ 高1 中1  → codex fixing
   ● APPROVED          jibunsee-react #390 Connect editor …            8m ago  claude → codex ✓ 低1  → merge on GitHub
+  ● CHANGES REQUESTED jibunsee-react #470 docs(mcp): 元データの …     2m ago  claude → codex ✓ tests✗  deepseek ✓ tests✗  → APPROVED  → claude fixing · tests✗: see the reports
  Done (last 24h)
   ✓ MERGED            business-libs  #15  Expose hazard metadata …   20m ago  codex → claude ✓ 低3
 ```
@@ -42,7 +43,10 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 状態: WAITING（次の巡回でレビュー）→ IN REVIEW → CHANGES REQUESTED（作者が直して push すると WAITING に戻る）/
 NEEDS YOU（回数の上限で止めた。マージするかはあなたが決める）/
 REVIEWED（コメントだけ）/ APPROVED（GitHub でマージしてよい）。SKIPPED は draft・`no-cross-review`・fork・信頼外の作者。
-テストが失敗した PR は CHANGES REQUESTED。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 3 日）。件数は、監視ボードでは pane の高さに収まるだけ（ボードが空き行数を `CR_MAX_LINES` で渡す）、手で実行したときは `CROSS_REVIEW_DONE_MAX`（既定 15）。
+テストが失敗した PR は CHANGES REQUESTED。そのときでもレビュアー全員が APPROVE なら、行の後ろに `→ APPROVED`（最後の判定）が付く。
+tests✗ が今回の変更のせいか（main で前から落ちているだけか）は、レポートを見て決める。NEEDS YOU の行の `→ APPROVED @<sha> (head … not reviewed)` は、
+その前の head での判定で、いまの head は誰も見ていない。
+表示の決まりの試験: `python3 -m unittest cross-review/test_status.py`（偽の state・レポートで classify を確かめる）。下の Done は最近マージ・クローズした PR（`CROSS_REVIEW_DONE_DAYS`、既定 3 日）。件数は、監視ボードでは pane の高さに収まるだけ（ボードが空き行数を `CR_MAX_LINES` で渡す）、手で実行したときは `CROSS_REVIEW_DONE_MAX`（既定 15）。
 各行の `作者 → レビュアー ✓/✗/~ 指摘数` の作者は `author:` label か、レポートの author 行。
 IN REVIEW の行には、いま何をしているかが出る: `running tests 0:42`、または
 `claude Read index.ts · 12 steps · active · 2:15`（最後の操作・ツール実行数・45 秒以内に動きがあれば active、無ければ quiet と経過）。

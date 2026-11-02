@@ -11,6 +11,9 @@ One line per PR, newest first. Open PRs on top:
   NEEDS YOU          reviewed MAX_ROUNDS times and still changing — automatic review stopped, you decide
   SKIPPED            draft / no-cross-review label / from a fork / author not trusted
 
+When the last review round has APPROVE from every reviewer but the line is not APPROVED (tests✗ / secrets✗
+in a report, or review stopped), the final word follows the reviewers: "CHANGES REQUESTED … → APPROVED".
+
 Below, PRs merged or closed in the last CROSS_REVIEW_DONE_DAYS days (default 3): as many as fit in
 CR_MAX_LINES (the board passes its free height), else CROSS_REVIEW_DONE_MAX (default 15).
 
@@ -234,6 +237,11 @@ def all_approved(revs: dict[str, dict]) -> bool:
                               for s in revs.values())
 
 
+def verdicts_approved(revs: dict[str, dict]) -> bool:
+    """Every reviewer said APPROVE (tests / secrets aside) — the reviewers' final word on that head."""
+    return bool(revs) and all(s["verdict"] == "APPROVE" for s in revs.values())
+
+
 def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
     repo, num = cfg["name"], pr["number"]
     sha = (pr.get("headRefOid") or "")[:8]
@@ -284,19 +292,29 @@ def classify(pr: dict, cfg: dict, running: set[tuple[str, str]]) -> dict:
                 key, note = "approved", "→ merge on GitHub"
             else:
                 key = "reviewed"
+    # the last reviewed round said APPROVE from everyone, but the line is not APPROVED (tests✗ / secrets✗,
+    # or review stopped): show the final word after the state, e.g. "CHANGES REQUESTED → APPROVED"
+    final_revs = reviews or (last[2] if last else {})
+    final = "APPROVED" if key in ("changes", "needs_you", "reviewed") and verdicts_approved(final_revs) else ""
+    if final and key == "changes":
+        flags = [f for f, hit in (("tests✗", any(s["tests_failed"] for s in final_revs.values())),
+                                  ("secrets✗", any(s.get("secrets") for s in final_revs.values()))) if hit]
+        note = f"{' '.join(flags)}: see the reports" if flags else ""
     if key in ("merged", "closed") and inbox:
         note = f"inbox: {inbox[0][0]} {len(inbox)} left"
     if key in ("needs_you", "skipped") and rounds:
-        extra = f"{len(rounds)} rounds" + (f", all approved at {approved}" if approved else ", never all approved")
+        extra = f"{len(rounds)} rounds" + (f", all approved at {approved}" if approved
+                                           else ", last round APPROVE with tests✗/secrets✗" if final else ", never all approved")
         note = f"{note} · {extra}" if note else extra
     return {"key": key, "when": when, "repo": repo, "num": num, "title": pr.get("title", ""),
-            "agent": agent, "reviews": reviews, "note": note,
+            "agent": agent, "reviews": reviews, "note": note, "final": final,
             "last": last if not reviews and key not in ("running",) else None}
 
 
 def render_line(it: dict, repo_w: int) -> str:
     label, color, icon = STATES[it["key"]]
     head = f"  {color}{icon} {label:<17}{RESET} {DIM}{fit(it['repo'], repo_w)}{RESET} {('#' + str(it['num'])):<5} "
+    final = f"  {GREEN}{BOLD}→ {it['final']}{RESET}" if it.get("final") else ""
     title = fit(it["title"], 44)
     # who wrote it → who reviewed it, e.g. "codex → claude ✓ 低2"
     pending = it["key"] in ("waiting", "running")
@@ -309,7 +327,7 @@ def render_line(it: dict, repo_w: int) -> str:
     who = f"{it['agent'] or '?'} → " + cells
     note = (f"  {it['note']}" if it["key"] == "running" else f"  {DIM}{it['note']}{RESET}") if it["note"] else ""
     when = f"{DIM}{ago(it['when']):>7}{RESET}" if it["when"] else " " * 7
-    return f"{head}{title}  {when}  {who}{note}"
+    return f"{head}{title}  {when}  {who}{final}{note}"
 
 
 def history(repo: str, num: int, gh_repo: str, cfg: dict) -> int:
@@ -325,7 +343,8 @@ def history(repo: str, num: int, gh_repo: str, cfg: dict) -> int:
         print(f"  {DIM}まだレビューされていません{RESET}")
         return 0
     for i, (sha, when, revs) in enumerate(rounds, 1):
-        mark = f"{GREEN}all approved{RESET}" if all_approved(revs) else ""
+        mark = f"{GREEN}all approved{RESET}" if all_approved(revs) else \
+            (f"{GREEN}APPROVED{RESET} {DIM}(tests✗/secrets✗ — see the reports){RESET}" if verdicts_approved(revs) else "")
         cur = f" {BOLD}← head{RESET}" if sha == head else ""
         print(f"  {i:>2}. {datetime.fromtimestamp(when):%m/%d %H:%M}  {sha}  {reviewer_cells(revs)}  {mark}{cur}")
     if head and head not in {r[0] for r in rounds}:

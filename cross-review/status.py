@@ -114,8 +114,13 @@ def running_reviews() -> set[tuple[str, str]]:
 
 
 def summarize_report(path: Path) -> dict:
-    """Verdict, findings by severity and test failure from a report cross-review.sh wrote."""
+    """Verdict, findings by severity and test result from a report cross-review.sh wrote.
+
+    tests_ran: the report has a "- tests:" line with at least one "exit=N" (commands were run).
+    tests_failed: one of them ended with a non-zero exit.
+    """
     verdict, sev, tests_failed, sec, author, secrets = "", {"高": 0, "中": 0, "低": 0}, False, "", "", False
+    tests_ran = False
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.search(r"/ author: ([\w-]+) /", line)              # "- head: `…` / author: codex / reviewed: …"
         if m and not author:
@@ -123,6 +128,8 @@ def summarize_report(path: Path) -> dict:
         if line.startswith("## "):
             sec = line[3:].strip()
             continue
+        if line.startswith("- tests:") and re.search(r"exit=\d", line):
+            tests_ran = True
         if line.startswith("- tests:") and re.search(r"exit=[1-9]", line):
             tests_failed = True
         if re.match(r"- secrets: [1-9]\d* found", line):
@@ -133,7 +140,8 @@ def summarize_report(path: Path) -> dict:
         m = re.match(r"- \[(高|中|低)\]", line)
         if sec == "指摘" and m:
             sev[m.group(1)] += 1
-    return {"verdict": verdict or "?", "sev": sev, "tests_failed": tests_failed, "author": author, "secrets": secrets}
+    return {"verdict": verdict or "?", "sev": sev, "tests_failed": tests_failed, "tests_ran": tests_ran,
+            "author": author, "secrets": secrets}
 
 
 def mmss(sec: float) -> str:
@@ -211,7 +219,10 @@ def reviewer_cells(reviews: dict[str, dict]) -> str:
         v = s["verdict"]
         mark, col = {"APPROVE": ("✓", GREEN), "CHANGES_REQUESTED": ("✗", RED)}.get(v, ("~", MAGENTA))
         sev = " ".join(f"{k}{n}" for k, n in s["sev"].items() if n)
-        test = (f" {RED}tests✗{RESET}" if s["tests_failed"] else "") + (f" {RED}{BOLD}secrets✗{RESET}" if s.get("secrets") else "")
+        # tests✗: a test command failed. tests✓: they ran and all passed. Nothing: no tests for this repo.
+        test = (f" {RED}tests✗{RESET}" if s["tests_failed"]
+                else f" {GREEN}tests✓{RESET}" if s.get("tests_ran") else "")
+        test += f" {RED}{BOLD}secrets✗{RESET}" if s.get("secrets") else ""
         cells.append(f"{col}{r} {mark}{RESET}{(' ' + DIM + sev + RESET) if sev else ''}{test}")
     return "  ".join(cells)
 

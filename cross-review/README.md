@@ -43,6 +43,7 @@ GitHub の課金は発生しない（gh API は無料）。レビューは各エ
 状態: WAITING（次の巡回でレビュー）→ IN REVIEW → CHANGES REQUESTED（作者が直して push すると WAITING に戻る）/
 NEEDS YOU（回数の上限で止めた。マージするかはあなたが決める）/
 REVIEWED（コメントだけ）/ APPROVED（GitHub でマージしてよい）。SKIPPED は draft・`no-cross-review`・fork・信頼外の作者。
+レビュアーの後ろの `tests✓` は、試験を走らせて全部が exit=0 だったこと、`tests✗` はどれかが 0 以外だったこと（試験の設定が無い・走らせていないときは何も出ない）。
 テストが失敗した PR は CHANGES REQUESTED。そのときでもレビュアー全員が APPROVE なら、行の後ろに `→ APPROVED`（最後の判定）が付く。
 tests✗ が今回の変更のせいか（main で前から落ちているだけか）は、レポートを見て決める。NEEDS YOU の行の `→ APPROVED @<sha> (head … not reviewed)` は、
 その前の head での判定で、いまの head は誰も見ていない。

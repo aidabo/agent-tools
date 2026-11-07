@@ -36,7 +36,7 @@ class Classify(unittest.TestCase):
             done = self.state / f"x-9-{sha}-{r}.done"
             done.touch()
             os.utime(done, (time.time() - self.age,) * 2)
-            tests = "- exit=1: yarn typecheck" if tests_failed else "- ok: yarn test"
+            tests = "- exit=1: yarn typecheck" if tests_failed else "- exit=0: yarn test"
             (self.reports / f"x-pr9-{sha}-{r}.md").write_text(
                 f"- head: `{sha}` / author: claude / reviewed: x\n- tests: {tests}\n- secrets: none\n\n## 判定\n{verdict}\n",
                 encoding="utf-8")
@@ -66,6 +66,35 @@ class Classify(unittest.TestCase):
         self.assertIn("→ APPROVED", line)
         self.assertIn("claude fixing · tests✗: see the reports", line)
         self.assertNotIn("secrets✗", line)
+
+    def report(self, tests_line: str, body: str = "") -> dict:
+        path = self.reports / "one.md"
+        path.write_text(f"- head: `aaaaaaaa` / author: claude / reviewed: x\n- tests: {tests_line}\n- secrets: none\n\n## 判定\nAPPROVE\n{body}",
+                        encoding="utf-8")
+        s = S.summarize_report(path)
+        return s, PLAIN.sub("", S.reviewer_cells({"codex": s}))
+
+    def test_tests_pass_mark(self):
+        s, cell = self.report("- exit=0: yarn --cwd apps/host typecheck - exit=0: yarn --cwd apps/host vitest related --run")
+        self.assertEqual((s["tests_ran"], s["tests_failed"]), (True, False))
+        self.assertEqual(cell, "codex ✓ tests✓")
+
+    def test_tests_fail_mark_when_any_command_fails(self):
+        s, cell = self.report("- exit=0: yarn typecheck - exit=2: yarn vitest")
+        self.assertEqual((s["tests_ran"], s["tests_failed"]), (True, True))
+        self.assertEqual(cell, "codex ✓ tests✗")
+
+    def test_no_mark_without_tests(self):
+        for line in ("(このリポジトリにテスト設定なし) ", "(テストは実行していない)"):
+            s, cell = self.report(line)
+            self.assertEqual((s["tests_ran"], s["tests_failed"]), (False, False))
+            self.assertEqual(cell, "codex ✓")
+
+    def test_exit_inside_a_command_and_quotes_in_the_body_do_not_count(self):
+        s, cell = self.report("- exit=0: sh -c 'echo exit=1; true'",
+                              body="\n## テスト\n- tests: - exit=1: yarn typecheck（前回の例）\n")
+        self.assertEqual((s["tests_ran"], s["tests_failed"]), (True, False))
+        self.assertEqual(cell, "codex ✓ tests✓")
 
     def test_needs_you_names_the_approved_head(self):
         self.round("bbbbbbbb", "CHANGES_REQUESTED")

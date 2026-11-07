@@ -113,11 +113,17 @@ def running_reviews() -> set[tuple[str, str]]:
     return out
 
 
+# cross-review.sh writes "- tests: - exit=0: <cmd> - exit=2: <cmd>" (one "- exit=$rc: $cmd" per command)
+TEST_EXIT = re.compile(r"(?:^|\s)-\s+exit=(\d+):")
+
+
 def summarize_report(path: Path) -> dict:
     """Verdict, findings by severity and test result from a report cross-review.sh wrote.
 
-    tests_ran: the report has a "- tests:" line with at least one "exit=N" (commands were run).
-    tests_failed: one of them ended with a non-zero exit.
+    tests_ran: the header's "- tests:" line has at least one "- exit=N: <command>" entry (commands were run).
+    tests_failed: one of those entries has a non-zero N. Only the entries' exit fields are read (an
+    "exit=1" inside a command does not count) and only the header (before the first "## "), so a
+    reviewer quoting a tests line in the review body does not change the mark.
     """
     verdict, sev, tests_failed, sec, author, secrets = "", {"高": 0, "中": 0, "低": 0}, False, "", "", False
     tests_ran = False
@@ -128,10 +134,10 @@ def summarize_report(path: Path) -> dict:
         if line.startswith("## "):
             sec = line[3:].strip()
             continue
-        if line.startswith("- tests:") and re.search(r"exit=\d", line):
-            tests_ran = True
-        if line.startswith("- tests:") and re.search(r"exit=[1-9]", line):
-            tests_failed = True
+        if not sec and line.startswith("- tests:"):
+            codes = [int(c) for c in TEST_EXIT.findall(line[len("- tests:"):])]
+            tests_ran = tests_ran or bool(codes)
+            tests_failed = tests_failed or any(codes)
         if re.match(r"- secrets: [1-9]\d* found", line):
             secrets = True
         if sec == "判定" and not verdict and line.strip():

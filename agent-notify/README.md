@@ -59,8 +59,7 @@ Set it back to `true` (or remove it) to send again. `doctor` shows such routes a
 - `doctor` prints a target-format reminder line before listing routes
 - `doctor` also prints a concrete target example line for easier copy/paste
 - `doctor` route lines keep `target=...` but also note `session:window.pane_index`
-- `sendtmux.sh` is the local helper OpenClaw should call when it sees an `st ...` command
-- `openclaw-sendtmux-rule.txt` contains a copy-paste rule for OpenClaw console setup
+- `sendtmux.sh` is the generic local helper for sending an `st ...` command to a tmux pane
 - `sendtmux.sh` uses a brief delay before Enter, configurable with `SENDTMUX_DELAY_SECONDS`
 - runtime stop-hook state is stored under `~/.notify/state/` per pane:
   - `prompt-submit/<session>.<window>.<pane>.json` — UserPromptSubmit records (includes `first_prompt_excerpt` / `first_prompt_summary` on first turn)
@@ -76,6 +75,9 @@ Set it back to `true` (or remove it) to send again. `doctor` shows such routes a
   - `CLAWHIP_NOTIFY_PANE_TITLE`
   - `CLAWHIP_NOTIFY_WINDOW_INDEX`
   - `CLAWHIP_NOTIFY_PANE_INDEX`
+- `CLAWHIP_*` is a legacy-compatible environment namespace used by the installed stop hook and
+  launcher. It is intentionally retained until the installed hook ABI is migrated; it is not an
+  unused feature to remove in this cleanup.
 - for sandboxed or split-process runs, set `CLAWHIP_NOTIFY_PROJECT_ROOT` to the repo checkout path and keep `CLAWHIP_NOTIFY_STATE_ROOT` under `.../.omx/notify-state`
 - `doctor` warns when the shell env root and the env-file root differ, and it also reports whether the shared state directory exists and is writable
 - native hook logs now include `project_root`, `state_root`, `repo_root`, and `worktree_root` so a monitor pane can see exactly which checkout is active
@@ -139,5 +141,6 @@ The `config` main-menu item is read-only; use command-line subcommands to change
 
 `$HOME/.notify`
 
-The install menu copies the repo-managed assets into `~/.notify` and can keep
-compatibility symlinks under `~/.clawhip` if needed.
+The install menu copies the repo-managed assets into `~/.notify`. The hook may still read the legacy
+`~/.clawhip/state/prompt-submit.json` as a compatibility fallback for older sessions; this fallback
+is read-only and is intentionally retained until old hook state expires.

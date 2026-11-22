@@ -54,4 +54,11 @@
   （通知の 1 行は notify.sh が、相手が手すきのときだけ送る）。
 - レビュー用 worktree（`REPOS` の 4 列目。作業ツリーの隣に作られる `*-review`）で作業しない。スクリプトが毎回上書きする。
 - 他のエージェントのブランチ・作業ツリーを切り替えない。そこに commit しない。
+- ユーザーの作業ツリー（`REPOS` の 3 列目。main のまま開発サーバーが動いている）で commit しない・ブランチを切り替えない。
+  作業は自分の worktree で、`git fetch origin` のあと**最新の `origin/main` から**新しいブランチを作って行う
+  （手元の main からは作らない。手元の main に GitHub に無いコミットがあると、それが PR に入る）。例:
+  `git -C <ユーザーの作業ツリー> fetch origin && git -C <ユーザーの作業ツリー> worktree add ../<repo>-<名前> -b <branch> origin/main`
+  main の上で commit すると、PR がマージされたあともユーザーの `git pull` が早送りできず、手元だけのマージが毎回できる
+  （2026-11-19 に 1 回 main で commit された結果、11-22 までに 18 個たまった）。ユーザーの main は `pull.ff only` にしてあり、そうなると pull が止まる。
+  ユーザーの main が GitHub と分かれているのに気づいたら、自分で reset しない。`git log origin/main..main` と `git diff --stat origin/main main` の結果を見せて、ユーザーに決めてもらう。
 - レビュー結果のファイル（`<ワークスペース>/.agent-tools/reviews/`）を書き換えない。
